@@ -43,20 +43,21 @@ O conjunto passou a privilegiar quatro operações mentais relevantes para escol
 | perguntas de autoavaliação sem resposta |                    155 |
 | checklists de capítulo novas            |                     15 |
 | itens de checklist no conjunto          |                    159 |
-| tabelas no conjunto                     |                     51 |
-| blocos JavaScript                       |                    107 |
-| palavras nos 15 capítulos               | aproximadamente 38 500 |
+| tabelas no conjunto                     |                     52 |
+| blocos JavaScript                       |                    109 |
+| palavras nos 15 capítulos               | aproximadamente 39 600 |
 
 Foram criadas 10 perguntas por capítulo entre `00` e `13` e 15 perguntas no resumo final. Todos os capítulos cumprem, portanto, o intervalo pedido de 10 a 20 perguntas.
 
 ## Novas tabelas e comparações
 
-Foram acrescentadas 16 tabelas comparativas, para um total de 51 tabelas no manual:
+Foram acrescentadas 17 tabelas pedagógicas, para um total de 52 tabelas no manual:
 
 | Capítulo | Comparação acrescentada                                           |
 | -------- | ----------------------------------------------------------------- |
 | 00       | Server, Atlas, `mongosh` e Node.js Driver                         |
 | 01       | Atlas user, database user, Network Access, replica set e sharding |
+| 02       | vocabulário do modelo documental                                  |
 | 02       | embedding versus referencing                                      |
 | 03       | `mongodb://` versus `mongodb+srv://`                              |
 | 04       | timeouts por fase de ligação/operação                             |
@@ -191,7 +192,7 @@ Estas probabilidades são prioridades pedagógicas baseadas no syllabus e nas di
 - 15/15 capítulos com 10–20 perguntas.
 - 15/15 capítulos com mapa mental ou fluxograma.
 - 15/15 capítulos com mini desafio.
-- 107/107 blocos JavaScript aprovados por `node --check`.
+- 109/109 blocos JavaScript aprovados por `node --check`.
 - Fences equilibradas em todos os capítulos.
 - Nenhum marcador temporário ou trailing whitespace detetado.
 - Nomes, conteúdo técnico e secções originais preservados.

@@ -12,11 +12,123 @@
 
 ## Conceitos Fundamentais
 
+### Vocabulário do modelo documental
+
+Antes de decidir como relacionar dados, é necessário distinguir as unidades fundamentais do MongoDB:
+
+| Conceito       | Definição                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| Database       | contentor lógico de collections; faz parte do namespace e da organização dos dados                          |
+| Collection     | conjunto de documentos relacionado com um domínio, como `customers`, `orders` ou `products`                 |
+| Document       | unidade BSON persistida numa collection, formada por pares field-value                                      |
+| Field          | nome de uma propriedade do documento, como `status` ou `shippingAddress`                                    |
+| Value          | valor associado a um field; pode ser scalar, subdocumento, array ou outro tipo BSON                         |
+| Subdocument    | documento BSON embebido como valor de um field de outro documento                                           |
+| Array          | sequência ordenada de valores, incluindo scalars, subdocumentos ou outros arrays                            |
+| `_id`          | identificador único obrigatório de cada documento dentro da collection                                      |
+| Document model | organização de documentos, subdocumentos, arrays e referências para suportar os access patterns             |
+
+A hierarquia lógica pode ser representada assim:
+
+```text
+MongoDB deployment
+└── database: shop
+    ├── collection: customers
+    │   └── document: { _id, name, email, ... }
+    └── collection: orders
+        └── document: { _id, customerId, items, ... }
+```
+
+Uma **collection** é o alvo de operações como `find()`, `insertOne()` e `createIndex()`. Ao contrário de uma tabela relacional rígida, os seus documentos não têm obrigatoriamente os mesmos fields. Esta flexibilidade não elimina o schema: a aplicação, os índices e um validator podem estabelecer tipos, fields obrigatórios e outras invariantes.
+
 ### Documento como unidade de modelação
 
-Um documento MongoDB agrupa campos relacionados numa estrutura BSON. Ao contrário de uma linha relacional estritamente tabular, pode conter subdocumentos e arrays. A decisão central não é “normalizar sempre”, mas modelar para os **access patterns** e para os limites de consistência.
+Um documento MongoDB agrupa campos relacionados numa estrutura BSON. É simultaneamente a unidade normal de leitura/escrita e a fronteira de atomicidade de um write single-document. Ao contrário de uma linha relacional estritamente tabular, pode conter subdocumentos e arrays com estruturas próprias.
 
 Todos os documentos de uma collection têm um `_id` único. Se a aplicação não o fornecer, o driver gera normalmente um `ObjectId`. Existe um índice unique sobre `_id`.
+
+Os fields podem ser scalars ou estruturas compostas:
+
+- `status: "paid"` é um field com valor String;
+- `shippingAddress: { city: "Lisboa", country: "PT" }` contém um subdocumento;
+- `tags: ["mongodb", "nodejs"]` contém um array de scalars;
+- `items: [{ productId, quantity }]` contém um array de subdocumentos.
+
+Subdocumentos e arrays pertencem ao mesmo documento BSON pai. Não são linhas ou documentos independentes noutra collection. Esta distinção determina atomicidade, crescimento, índices multikey e a forma das queries.
+
+A decisão central não é “normalizar sempre”, mas organizar os documentos para os **access patterns**, a cardinalidade, o lifecycle dos dados e os limites de consistência.
+
+### O que é embedding?
+
+**Embedding** consiste em guardar dados relacionados dentro do mesmo documento, através de um subdocumento ou de um array. Os dados embebidos fazem parte da mesma unidade BSON e são lidos, escritos e limitados juntamente com o documento pai.
+
+Neste exemplo, a morada e os items estão embebidos na encomenda:
+
+```javascript
+const embeddedOrder = {
+    _id: orderId,
+    status: "pending",
+    shippingAddress: {
+        street: "Rua do Ouro, 10",
+        city: "Lisboa",
+        country: "PT",
+    },
+    items: [
+        {
+            productId,
+            nameSnapshot: "Teclado mecânico",
+            quantity: 1,
+        },
+    ],
+};
+```
+
+Embedding é especialmente adequado quando:
+
+- os dados são normalmente lidos em conjunto;
+- são criados, atualizados ou eliminados com o documento pai;
+- a relação é “contains” ou um-para-poucos;
+- a cardinalidade e o crescimento são limitados;
+- é valioso atualizar a estrutura numa única operação atómica.
+
+Embedding pode duplicar deliberadamente informação. Por exemplo, `nameSnapshot` preserva o nome do produto no momento da compra. Esta duplicação é uma decisão de domínio, não necessariamente um erro de normalização.
+
+Os principais custos são o crescimento do documento, a atualização de cópias duplicadas, a criação de mais index keys em arrays e o limite BSON de 16 MiB.
+
+### O que é referencing?
+
+**Referencing** consiste em guardar documentos relacionados separadamente e manter num deles o `_id` do outro. A referência é um valor BSON normal — frequentemente um `ObjectId` — e não transforma automaticamente os documentos numa única unidade.
+
+```javascript
+const customer = {
+    _id: customerId,
+    name: "Ana Martins",
+    email: "ana@example.com",
+};
+
+const referencedOrder = {
+    _id: orderId,
+    customerId: customer._id,
+    status: "pending",
+};
+```
+
+MongoDB não carrega `customer` automaticamente quando lê `referencedOrder`. A aplicação pode:
+
+- executar uma query adicional sobre `customers`;
+- obter vários documentos antecipadamente e relacioná-los em memória;
+- usar `$lookup` numa aggregation pipeline quando a operação o justificar;
+- manter alguns fields duplicados como snapshot ou resumo, criando um modelo híbrido.
+
+Uma referência também não cria, por defeito, uma foreign key com integridade referencial automática. A aplicação e o desenho das operações devem evitar referências inexistentes ou obsoletas; quando uma invariante abrange vários documentos, pode ser necessária uma transação.
+
+Referencing é especialmente adequado quando:
+
+- a entidade é partilhada por muitos documentos;
+- tem lifecycle independente;
+- muda frequentemente e deve existir uma única fonte atual;
+- a cardinalidade pode crescer sem limite prático;
+- os dados relacionados não são normalmente lidos em conjunto.
 
 ### Embedding versus referencing
 
@@ -28,6 +140,8 @@ Todos os documentos de uma collection têm um `_id` único. Se a aplicação nã
 | Crescimento            | limitado pelo documento    | entidades crescem separadamente             |
 | Relação                | “contains”, um-para-poucos | muitos-para-muitos, alta cardinalidade      |
 | Atualização partilhada | várias cópias              | uma fonte                                   |
+
+Esta comparação não é uma regra binária. Um modelo pode referenciar a entidade atual e, ao mesmo tempo, embebedar um snapshot dos fields que precisam de preservar contexto histórico.
 
 Usar embedding quando os dados são lidos/alterados juntos, têm cardinalidade limitada e pertencem ao ciclo de vida do pai. Usar references quando a entidade é partilhada, cresce sem limite prático, muda independentemente ou seria duplicada de forma dispendiosa.
 
