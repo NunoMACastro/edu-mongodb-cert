@@ -12,6 +12,64 @@
 
 ## Conceitos Fundamentais
 
+### Vocabulário das operações de mutação
+
+Depois de localizar documentos através de um filtro, uma operação de mutação pode alterar, substituir ou eliminar os matches:
+
+| Conceito        | Definição                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| Update          | alteração parcial expressa por update operators ou por uma update pipeline                             |
+| Update document | documento que contém operadores como `$set`, `$inc` ou `$unset`                                        |
+| Update pipeline | array de aggregation stages permitidos que calcula o novo estado do documento                          |
+| Replacement     | novo documento completo que toma o lugar do match, mantendo a identidade `_id`                         |
+| Delete          | remoção do documento completo da collection                                                            |
+| Upsert          | update-or-insert: atualiza um match ou insere quando nenhum existe                                      |
+| Result object   | metadata da escrita, incluindo acknowledgement e contadores                                            |
+| Match           | documento que satisfaz o filtro no momento em que a operação é executada                               |
+| Atomicidade     | propriedade que torna visível todo o write single-document ou nenhum estado intermédio                 |
+
+### O que é um update?
+
+Um update descreve **a alteração**, não o documento final completo. Os fields não mencionados permanecem, salvo quando um operador os remove ou a pipeline os substitui explicitamente.
+
+```javascript
+const originalDocument = {
+    _id: userId,
+    name: "Ana",
+    active: false,
+    locale: "pt-PT",
+};
+
+const updateDocument = {
+    $set: {
+        active: true,
+    },
+};
+```
+
+Aplicar `updateDocument` preserva `name` e `locale`. O servidor calcula e grava o novo estado numa operação atómica sobre o documento correspondente.
+
+### O que é um replacement?
+
+Um replacement descreve **todo o novo documento**, não apenas os fields alterados. Se o replacement for `{ name: "Ana", active: true }`, o field `locale` do exemplo anterior deixa de existir. O `_id` não pode ser mudado e é preservado quando é omitido no replacement.
+
+Replacement é adequado quando a aplicação possui e valida uma representação completa. Não deve ser usado como patch apenas porque o novo objeto contém os fields que se pretendem alterar.
+
+### O que é um delete?
+
+Um delete remove o documento completo que satisfaz o filtro. Não remove apenas os fields mencionados no filtro. `deleteOne()` afeta no máximo um match; `deleteMany()` afeta todos os matches.
+
+Um delete físico é diferente de soft delete. No soft delete, o documento permanece e um update altera fields como `deletedAt` ou `status`; todas as queries relevantes têm depois de excluir esses documentos.
+
+### Result objects antes da comparação
+
+`updateOne()`, `updateMany()` e `replaceOne()` devolvem `UpdateResult`; `deleteOne()` e `deleteMany()` devolvem `DeleteResult`. Estes objetos descrevem o resultado da escrita e não contêm, por defeito, o documento final.
+
+- `matchedCount`: quantos documentos satisfizeram o filtro de update;
+- `modifiedCount`: quantos ficaram efetivamente diferentes;
+- `upsertedId`: `_id` criado pelo ramo insert de um upsert;
+- `deletedCount`: quantos documentos foram removidos.
+
 ### update versus replace
 
 | Operação                 | Segundo argumento      |    Preserva campos omitidos? | Pode alterar `_id`? |
@@ -49,7 +107,7 @@ Com `upsert: true`, se nenhum documento corresponder, MongoDB constrói e insere
 
 Upsert deve ter um unique index alinhado com a chave lógica. Sem ele, upserts concorrentes podem criar duplicados.
 
-### Delete
+### Delete físico e soft delete
 
 Delete remove documentos, não os campos. Para soft delete, atualizar `deletedAt`/status e garantir que todas as queries respeitam a política. Soft delete melhora auditabilidade mas aumenta complexidade, índices e risco de “ressuscitar” dados.
 

@@ -12,6 +12,24 @@
 
 ## Conceitos Fundamentais
 
+### Vocabulário das transações
+
+| Conceito             | Definição                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Transação            | conjunto de operações MongoDB coordenadas como uma unidade all-or-nothing                                 |
+| Invariante           | regra de negócio que deve permanecer verdadeira antes e depois da operação                               |
+| `ClientSession`      | contexto lógico criado pelo `MongoClient` que acompanha operações, causalidade e estado transacional     |
+| Transaction callback | função assíncrona que contém as operações executadas pela Convenient Transaction API                     |
+| Commit               | tentativa de tornar permanentes e visíveis as alterações da transação                                    |
+| Abort                | término da transação sem aplicar as suas alterações MongoDB                                              |
+| Snapshot             | visão consistente dos dados usada pelas leituras da transação conforme as garantias configuradas         |
+| Concern              | configuração das garantias de leitura ou acknowledgement/durabilidade de escrita                         |
+| Retry                | repetição controlada da transação ou do commit perante erros transientes elegíveis                       |
+
+Uma session não é uma connection dedicada nem uma transação por si só. É o contexto que tem de ser passado às operações que pertencem à transação.
+
+### O que é uma transação?
+
 MongoDB garante atomicidade de cada write num único documento. Uma transação é apropriada quando uma invariante abrange vários documentos/collections e nenhum estado intermédio pode ser observado.
 
 Exemplos:
@@ -21,6 +39,26 @@ Exemplos:
 - gravar entidade e ledger que têm de concordar.
 
 Não usar transação quando embedding permite colocar a invariante num documento, quando eventual consistency é aceitável ou quando a coordenação envolve sistemas externos que MongoDB não consegue incluir atomicamente.
+
+### Lifecycle conceptual
+
+```text
+criar ClientSession
+       |
+       v
+iniciar transação
+       |
+       v
+executar operações sequenciais com { session }
+       |
+       +-- erro/regra falha --> abort
+       |
+       `-- operações válidas --> commit
+                                  |
+                                  `-- resultado incerto/transiente --> retry segundo o protocolo
+```
+
+Na Convenient API, `withTransaction()` coordena este lifecycle e pode voltar a executar a callback. Na Core API, a aplicação assume explicitamente `startTransaction()`, commit, abort e retry logic. Um abort descarta alterações MongoDB da transação, mas não desfaz emails, pagamentos ou outros side effects externos.
 
 ### ACID
 

@@ -12,7 +12,49 @@
 
 ## Conceitos Fundamentais
 
-### Insert
+### Vocabulário de CRUD e queries
+
+**CRUD** agrupa quatro intenções fundamentais: **Create**, **Read**, **Update** e **Delete**. Este capítulo cobre Create através de inserts e Read através de queries.
+
+| Conceito      | Definição                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| Write         | operação que pretende criar, alterar ou eliminar dados                                                  |
+| Read          | operação que consulta dados sem os modificar                                                            |
+| Insert        | write que acrescenta um novo documento a uma collection                                                 |
+| Query         | pedido de leitura composto por filtro e, opcionalmente, projection, sort, limit e outras opções        |
+| Filter        | documento MQL que descreve as condições de seleção                                                      |
+| Predicate     | condição dentro do filtro, como igualdade ou range                                                      |
+| Match         | documento que satisfaz o filtro                                                                         |
+| Result object | objeto devolvido por um write com acknowledgement, identificadores ou contadores                       |
+| Cursor        | objeto stateful que permite configurar e consumir zero ou mais resultados por batches                  |
+| Batch         | grupo de documentos transferido numa resposta inicial ou num `getMore`                                 |
+| Materializar  | carregar os resultados restantes numa estrutura como um array                                          |
+
+Um filtro não contém os resultados: contém apenas a descrição das condições. Do mesmo modo, um cursor não é um array; representa uma leitura que pode produzir resultados progressivamente.
+
+### O que é um insert?
+
+Um insert cria um documento novo na collection. O servidor valida regras aplicáveis, verifica constraints como unique indexes e persiste o documento e as respetivas index keys. O retorno normal é um result object, não o documento inserido.
+
+Se `_id` não for fornecido, o driver atribui normalmente um `ObjectId` antes de enviar o documento. Por isso, a aplicação pode consultar `result.insertedId` e o próprio objeto enviado pode já conter `_id`.
+
+### O que é uma query?
+
+Uma query de leitura pede ao servidor documentos que satisfazem um filtro. O filtro pode ser vazio, usar igualdade ou combinar predicates através de operadores. Projection, sort e limit alteram a forma, a ordem ou a quantidade do resultado, mas não substituem o filtro.
+
+No driver, a cardinalidade pretendida determina a API:
+
+```javascript
+const insertResult = await collection.insertOne(document);
+const cursor = collection.find(filter);
+const documentOrNull = await collection.findOne(filter);
+```
+
+- `insertResult` contém metadata do write;
+- `cursor` ainda tem de ser consumido;
+- `documentOrNull` é já um valor final único.
+
+### insertOne versus insertMany
 
 `insertOne(document, options)` insere um documento. Se `_id` estiver ausente, o driver atribui normalmente um `ObjectId` antes do envio. `insertMany(documents, options)` envia vários documentos e, por defeito, é ordered: para no primeiro erro. Com `ordered: false`, o servidor pode continuar operações independentes e a ordem de execução não deve ser assumida.
 
@@ -60,21 +102,21 @@ Operadores essenciais:
 `{ field: null }` corresponde normalmente a documentos em que `field` é `null` **ou não existe**. Para exigir `null` explícito:
 
 ```javascript
-{
+const explicitNullFilter = {
     field: {
-        $type: 10;
-    }
-}
+        $type: 10,
+    },
+};
 ```
 
 Para exigir existência:
 
 ```javascript
-{
+const existingFieldFilter = {
     field: {
-        $exists: true;
-    }
-}
+        $exists: true,
+    },
+};
 ```
 
 O código numérico 10 é BSON Null; a forma por alias, quando aceite no contexto, é mais legível.

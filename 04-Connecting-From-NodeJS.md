@@ -12,6 +12,34 @@
 
 ## Conceitos Fundamentais
 
+### Vocabulário da ligação
+
+Antes das opções de configuração, distingue os objetos e fases envolvidos:
+
+| Conceito             | Significado                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `MongoClient`        | objeto de alto nível que gere discovery, topologia, monitoring e pools                                 |
+| Topology             | visão dos servidores e respetivos papéis, por exemplo primary e secondaries                            |
+| Server               | processo MongoDB elegível para receber determinado comando                                             |
+| Connection/socket    | canal de comunicação de rede reutilizável entre driver e servidor                                      |
+| Connection pool      | conjunto de connections que o client mantém por servidor para reutilização                             |
+| Checkout             | obtenção temporária de uma connection do pool por uma operação                                         |
+| Wait queue           | fila de operações que aguardam uma connection disponível                                               |
+| Database handle      | objeto `Db` obtido com `client.db()`; seleciona uma database sem criar outro client                     |
+| Collection handle    | objeto `Collection` usado para executar operações; não representa uma nova ligação                     |
+
+O lifecycle simplificado de uma operação é:
+
+```text
+operação
+  -> selecionar um server elegível
+  -> obter uma connection do pool (checkout)
+  -> enviar o comando e receber a resposta
+  -> devolver a connection ao pool
+```
+
+O cursor pode exigir operações `getMore` posteriores, cada uma com nova seleção/checkout conforme o estado e a topologia. O pool pertence ao `MongoClient`, não ao handle de database, à collection ou ao request HTTP.
+
 ### Um cliente por processo
 
 `MongoClient` representa mais do que um socket: contém visão da topologia, monitoring e pools por servidor. Numa aplicação server-side de longa duração, deve normalmente existir uma instância partilhada por URI/configuração. `db()` e `collection()` são handles baratos e podem ser obtidos sem criar novos clientes.

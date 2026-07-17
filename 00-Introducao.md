@@ -12,6 +12,28 @@
 
 ## Conceitos Fundamentais
 
+### Vocabulário mínimo para usar o manual
+
+Este capítulo apresenta termos que serão aprofundados mais tarde. Para que não apareçam sem contexto, usa estas definições curtas como mapa inicial:
+
+| Conceito      | Significado neste manual                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------- |
+| Database      | contentor lógico de collections                                                                           |
+| Collection    | conjunto de documentos sobre um domínio                                                                   |
+| Document      | unidade BSON guardada numa collection                                                                     |
+| Field         | propriedade de um documento e respetivo valor                                                             |
+| Operação      | comando de leitura, escrita, gestão ou agregação enviado ao MongoDB                                      |
+| Query         | pedido de leitura; pode combinar filtro, projection, sort e outras opções                                |
+| Filter        | documento que descreve as condições que um documento deve satisfazer                                    |
+| Predicate     | condição individual ou composta dentro de um filtro                                                       |
+| Match         | documento que satisfaz o filtro                                                                           |
+| Cursor        | objeto que permite consumir zero ou mais resultados progressivamente                                      |
+| Result object | objeto com metadata e contadores de uma escrita; não é o documento alterado                              |
+| Index         | estrutura auxiliar que organiza keys para reduzir o trabalho de determinadas queries                    |
+| Transaction   | coordenação all-or-nothing de várias operações quando a atomicidade de um documento não é suficiente       |
+
+O percurso lógico do manual é: **dados → ligação → operações → resultados → índices → aggregation → transações → Search**. Estas definições são deliberadamente breves; cada capítulo especializado explica a semântica, as limitações e os custos.
+
 ### Âmbito do percurso
 
 O percurso oficial cobre Atlas, modelo documental, connection strings, `mongosh`, ligação a partir de Node.js, CRUD, índices e aggregation. Inclui ainda transações e MongoDB Search como unidades eletivas. Estes apontamentos tratam as eletivas como matéria relevante porque fazem parte da estrutura solicitada e exercitam decisões arquiteturais importantes.

@@ -12,6 +12,26 @@
 
 ## Conceitos Fundamentais
 
+### Vocabulário dos índices
+
+Um capítulo de índices exige distinguir a definição do índice, os valores que ele contém e o plano que o utiliza:
+
+| Conceito            | Definição                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Index specification | configuração passada a `createIndex()`, incluindo key pattern e options                               |
+| Key pattern         | fields e ordem/tipo declarados, por exemplo `{ status: 1, createdAt: -1 }`                            |
+| Index key           | valor derivado de um documento para um ou mais fields indexados                                       |
+| Index entry         | associação ordenada entre uma index key e a referência ao documento correspondente                   |
+| `COLLSCAN`          | leitura de documentos da collection sem usar um índice para localizar os candidatos                  |
+| `IXSCAN`            | percurso de um intervalo de index entries                                                             |
+| `FETCH`             | leitura do documento completo depois de localizar a referência através do índice                     |
+| Query plan          | estratégia escolhida para executar filtro, sort, projection e restantes requisitos                  |
+| Selectivity         | capacidade de uma condição reduzir o conjunto de candidatos                                          |
+| Cardinality         | quantidade de valores distintos ou de documentos numa fase, conforme o contexto                     |
+| Working set         | dados e índices usados frequentemente que o sistema procura manter em memória                        |
+
+### O que é um índice?
+
 Sem índice adequado, MongoDB pode fazer `COLLSCAN` e examinar todos os documentos. Um índice guarda chaves ordenadas e referências aos documentos, permitindo localizar ranges e devolver resultados ordenados sem ler toda a collection.
 
 O benefício em reads tem custos:
@@ -20,6 +40,16 @@ O benefício em reads tem custos:
 - CPU/I/O em inserts, updates e deletes;
 - build e manutenção operacional;
 - mais opções para o query planner.
+
+O índice não altera o resultado correto da query; altera os caminhos disponíveis para o obter. Cada write que modifica um field indexado pode também ter de atualizar index entries.
+
+### Single-field, compound e multikey
+
+- **Single-field index:** indexa um único field, por exemplo `{ email: 1 }`.
+- **Compound index:** usa vários fields num key pattern ordenado, por exemplo `{ status: 1, createdAt: -1 }`. A ordem define prefixos e capacidade de suportar determinados sorts.
+- **Multikey index:** índice que contém keys derivadas de elementos de um array. MongoDB torna-o multikey automaticamente quando um path indexado contém um array.
+
+Compound e multikey não são alternativas mutuamente exclusivas. Um índice pode ser simultaneamente compound, por ter vários fields, e multikey, porque um desses fields contém um array.
 
 ### Tipos e propriedades
 

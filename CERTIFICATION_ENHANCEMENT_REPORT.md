@@ -8,7 +8,7 @@
 - **Ficheiros enriquecidos:** 15 capítulos Markdown
 - **Objetivo:** transformar conteúdo tecnicamente revisto num manual orientado à retenção, interpretação de código e escolha múltipla
 
-Este trabalho não repetiu a revisão técnica anterior nem reescreveu os capítulos. O conteúdo, os nomes, a ordem das secções originais e o estilo foram preservados. Foram acrescentadas camadas pedagógicas no final de cada capítulo. Este relatório é o único novo ficheiro, por ser o artefacto expressamente pedido.
+Este trabalho não repetiu a revisão técnica anterior nem reescreveu os capítulos. O conteúdo, os nomes, a ordem das secções originais e o estilo foram preservados. Foram acrescentadas bases conceptuais no início dos capítulos que delas necessitavam e camadas de certificação no final de todos os capítulos. Este relatório é o único novo ficheiro, por ser o artefacto expressamente pedido.
 
 ## Melhorias introduzidas
 
@@ -32,6 +32,22 @@ O conjunto passou a privilegiar quatro operações mentais relevantes para escol
 3. eliminar alternativas por tipo BSON, atomicidade ou pré-condição;
 4. avaliar índice, memória e custo apenas depois da semântica.
 
+## Correções pedagógicas pós-auditoria
+
+Uma auditoria posterior verificou se os conceitos centrais eram definidos antes de serem comparados ou utilizados. Foram corrigidos integralmente sete capítulos:
+
+| Capítulo | Correção estrutural |
+| -------- | ------------------- |
+| 00 | glossário inicial de database, collection, document, operação, query, filtro, cursor, result object, índice e transação |
+| 01 | definição antecipada de cloud provider, region, availability zone, tier, topology e multi-region |
+| 04 | vocabulário de client, topology, server, connection, pool, checkout, wait queue e handles |
+| 05 | definição de CRUD, insert, query, filter, predicate, match, cursor, batch, materialização e result object antes das APIs |
+| 06 | explicação individual de update, replacement e delete, seguida dos result objects e só depois da comparação |
+| 09 | definição de index specification, key pattern, index entry, scans, fetch, query plan, selectivity e tipos base |
+| 12 | definição de transaction, session, commit, abort, snapshot e retry, acompanhada pelo lifecycle antes das APIs |
+
+O capítulo 05 recebeu ainda a correção dos filtros de BSON Null e existência para object literals JavaScript inequívocos. Os capítulos 03, 07, 08, 10, 11, 13 e 99 já apresentavam progressão adequada e não foram artificialmente expandidos.
+
 ## Cobertura quantitativa
 
 | Elemento                                |       Quantidade final |
@@ -43,31 +59,38 @@ O conjunto passou a privilegiar quatro operações mentais relevantes para escol
 | perguntas de autoavaliação sem resposta |                    155 |
 | checklists de capítulo novas            |                     15 |
 | itens de checklist no conjunto          |                    159 |
-| tabelas no conjunto                     |                     52 |
-| blocos JavaScript                       |                    109 |
-| palavras nos 15 capítulos               | aproximadamente 39 600 |
+| tabelas no conjunto                     |                     59 |
+| blocos JavaScript                       |                    111 |
+| palavras nos 15 capítulos               | aproximadamente 41 700 |
 
 Foram criadas 10 perguntas por capítulo entre `00` e `13` e 15 perguntas no resumo final. Todos os capítulos cumprem, portanto, o intervalo pedido de 10 a 20 perguntas.
 
 ## Novas tabelas e comparações
 
-Foram acrescentadas 17 tabelas pedagógicas, para um total de 52 tabelas no manual:
+Foram acrescentadas 24 tabelas pedagógicas, para um total de 59 tabelas no manual:
 
 | Capítulo | Comparação acrescentada                                           |
 | -------- | ----------------------------------------------------------------- |
+| 00       | vocabulário mínimo do manual                                      |
 | 00       | Server, Atlas, `mongosh` e Node.js Driver                         |
 | 01       | Atlas user, database user, Network Access, replica set e sharding |
+| 01       | cloud provider, region, tier e topologia                          |
 | 02       | vocabulário do modelo documental                                  |
 | 02       | embedding versus referencing                                      |
 | 03       | `mongodb://` versus `mongodb+srv://`                              |
+| 04       | vocabulário da ligação e do pool                                  |
 | 04       | timeouts por fase de ligação/operação                             |
+| 05       | vocabulário de CRUD, query, cursor e result object                |
 | 05       | `insertOne`, `insertMany`, `find` e `findOne`                     |
+| 06       | vocabulário de update, replacement, delete e result objects       |
 | 06       | update, replace, compound update e delete                         |
 | 07       | projection, limit, batch size, skip e contagens                   |
 | 08       | famílias de retorno do CRUD                                       |
+| 09       | vocabulário de index keys, scans, plans e selectivity             |
 | 09       | single, compound, multikey, unique, partial e covered             |
 | 10       | `find()` versus `aggregate()`                                     |
 | 11       | formas de consumir `AggregationCursor`                            |
+| 12       | vocabulário e lifecycle de transactions                           |
 | 12       | write atómico, transação, outbox e APIs de transaction            |
 | 13       | B-tree, text index, Search e `$searchMeta`                        |
 | 99       | sinais da pergunta e família de solução                           |
@@ -192,7 +215,7 @@ Estas probabilidades são prioridades pedagógicas baseadas no syllabus e nas di
 - 15/15 capítulos com 10–20 perguntas.
 - 15/15 capítulos com mapa mental ou fluxograma.
 - 15/15 capítulos com mini desafio.
-- 109/109 blocos JavaScript aprovados por `node --check`.
+- 111/111 blocos JavaScript aprovados por `node --check`.
 - Fences equilibradas em todos os capítulos.
 - Nenhum marcador temporário ou trailing whitespace detetado.
 - Nomes, conteúdo técnico e secções originais preservados.

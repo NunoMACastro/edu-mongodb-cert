@@ -29,6 +29,21 @@ MongoDB Atlas é o serviço gerido que provisiona e opera deployments MongoDB. O
 
 Um **Atlas user** entra no portal/API de gestão. Um **database user** autentica-se no MongoDB Server. Dar acesso ao projeto a alguém não cria automaticamente credenciais de base de dados, e criar um database user não dá acesso ao portal.
 
+### Região, provider, tier e topologia
+
+Ao criar um database deployment, o Atlas pede decisões de infraestrutura que não alteram a forma dos documentos, mas influenciam capacidade, latência, disponibilidade e custo:
+
+| Conceito          | O que representa                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| Cloud provider    | plataforma de infraestrutura onde o deployment é executado                                                |
+| Region            | localização geográfica principal dos recursos                                                             |
+| Availability zone | localização isolada dentro de uma region, usada para reduzir falhas correlacionadas                       |
+| Tier              | perfil de capacidade e limites, incluindo CPU, memória, storage e funcionalidades aplicáveis              |
+| Topology          | organização dos processos como replica set ou sharded cluster                                             |
+| Multi-region      | distribuição de membros por mais de uma region para resiliência ou proximidade, com trade-offs de latência |
+
+Escolher uma region próxima da aplicação reduz normalmente o round-trip time. Um tier maior oferece mais recursos, mas não corrige um schema inadequado, uma query sem índice ou uma operação que transfere dados desnecessários. Multi-region acrescenta resiliência geográfica, mas pode aumentar latência e custo.
+
 ### Acesso em duas condições
 
 Uma ligação Atlas exige normalmente:
