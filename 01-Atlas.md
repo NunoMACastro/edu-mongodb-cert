@@ -19,13 +19,13 @@ MongoDB Atlas é o serviço gerido que provisiona e opera deployments MongoDB. O
 
 ### Hierarquia
 
-| Nível | Responsabilidade |
-|---|---|
-| Organization | propriedade, equipas e faturação agregada |
-| Project | fronteira operacional para deployments, database users, access lists e alertas |
-| Database deployment | processos MongoDB, storage e topologia |
-| Database | namespace lógico dentro do deployment |
-| Collection | conjunto de documentos e índices |
+| Nível               | Responsabilidade                                                               |
+| ------------------- | ------------------------------------------------------------------------------ |
+| Organization        | propriedade, equipas e faturação agregada                                      |
+| Project             | fronteira operacional para deployments, database users, access lists e alertas |
+| Database deployment | processos MongoDB, storage e topologia                                         |
+| Database            | namespace lógico dentro do deployment                                          |
+| Collection          | conjunto de documentos e índices                                               |
 
 Um **Atlas user** entra no portal/API de gestão. Um **database user** autentica-se no MongoDB Server. Dar acesso ao projeto a alguém não cria automaticamente credenciais de base de dados, e criar um database user não dá acesso ao portal.
 
@@ -40,10 +40,10 @@ Adicionar `0.0.0.0/0` permite ligações de qualquer origem IPv4 e deve ser apen
 
 ### Replica set versus sharding
 
-| Conceito | Resolve principalmente | Unidade |
-|---|---|---|
-| Replica set | disponibilidade e redundância | cópias do mesmo conjunto de dados |
-| Sharded cluster | escala horizontal e distribuição | partições por shard key |
+| Conceito        | Resolve principalmente           | Unidade                           |
+| --------------- | -------------------------------- | --------------------------------- |
+| Replica set     | disponibilidade e redundância    | cópias do mesmo conjunto de dados |
+| Sharded cluster | escala horizontal e distribuição | partições por shard key           |
 
 Um shard é tipicamente ele próprio um replica set. Replicação não divide o dataset; sharding não substitui redundância. Reads secundárias podem aliviar certos workloads, mas trazem semântica de consistência e não aumentam a capacidade de escrita do primary de um replica set.
 
@@ -79,9 +79,9 @@ Alta disponibilidade, backup e disaster recovery são objetivos diferentes:
 
 ### URI Atlas SRV
 
-~~~text
+```text
 mongodb+srv://<username>:<password>@<cluster-host>/<default-database>?retryWrites=true&w=majority
-~~~
+```
 
 - `username` e `password` são credenciais do database user.
 - Caracteres reservados nas credenciais devem usar percent-encoding.
@@ -94,12 +94,12 @@ mongodb+srv://<username>:<password>@<cluster-host>/<default-database>?retryWrite
 
 No Atlas UI, selecionar o deployment e a ação **Load Sample Dataset**. Depois, validar em `mongosh`:
 
-~~~mongosh
+```mongosh
 show dbs
 use sample_mflix
 show collections
 db.movies.findOne({}, { title: 1, year: 1 })
-~~~
+```
 
 `use` altera a database ativa no shell; não cria a database até existir uma escrita. `show` e `use` são helpers de `mongosh`, não métodos do Node.js Driver.
 
@@ -109,86 +109,93 @@ db.movies.findOne({}, { title: 1, year: 1 })
 
 ### Exemplo 1 — health check seguro
 
-~~~javascript
+```javascript
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 
 if (!uri) {
-  throw new Error("MONGODB_URI não está definida.");
+    throw new Error("MONGODB_URI não está definida.");
 }
 
 const client = new MongoClient(uri, {
-  appName: "atlas-health-check",
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true
-  },
-  serverSelectionTimeoutMS: 5_000
+    appName: "atlas-health-check",
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    },
+    serverSelectionTimeoutMS: 5_000,
 });
 
 try {
-  await client.connect();
-  const result = await client.db("admin").command({ ping: 1 });
-  console.log(result);
+    await client.connect();
+    const result = await client.db("admin").command({ ping: 1 });
+    console.log(result);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: tipicamente `{ ok: 1 }`, se rede, DNS, TLS, autenticação e autorização permitirem a operação.
 
 ### Exemplo 2 — inventariar os sample datasets
 
-~~~javascript
+```javascript
 import { MongoClient } from "mongodb";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const admin = client.db("admin").admin();
-  const { databases } = await admin.listDatabases({
-    nameOnly: true,
-    authorizedDatabases: true
-  });
+    const admin = client.db("admin").admin();
+    const { databases } = await admin.listDatabases({
+        nameOnly: true,
+        authorizedDatabases: true,
+    });
 
-  const sampleDatabases = databases
-    .map(({ name }) => name)
-    .filter((name) => name.startsWith("sample_"))
-    .sort();
+    const sampleDatabases = databases
+        .map(({ name }) => name)
+        .filter((name) => name.startsWith("sample_"))
+        .sort();
 
-  console.log(sampleDatabases);
+    console.log(sampleDatabases);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: lista ordenada das databases `sample_*` que o utilizador pode listar.
 
 ### Exemplo 3 — primeira leitura sobre `sample_supplies`
 
-~~~javascript
+```javascript
 import { MongoClient } from "mongodb";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const sales = client.db("sample_supplies").collection("sales");
-  const recentSales = await sales
-    .find(
-      { purchaseMethod: "Online" },
-      { projection: { _id: 0, saleDate: 1, storeLocation: 1, customer: 1 } }
-    )
-    .sort({ saleDate: -1 })
-    .limit(5)
-    .toArray();
+    const sales = client.db("sample_supplies").collection("sales");
+    const recentSales = await sales
+        .find(
+            { purchaseMethod: "Online" },
+            {
+                projection: {
+                    _id: 0,
+                    saleDate: 1,
+                    storeLocation: 1,
+                    customer: 1,
+                },
+            },
+        )
+        .sort({ saleDate: -1 })
+        .limit(5)
+        .toArray();
 
-  console.dir(recentSales, { depth: null });
+    console.dir(recentSales, { depth: null });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: até cinco vendas online, mais recentes primeiro.
 
@@ -298,19 +305,19 @@ Fontes oficiais: [Get Started with Atlas](https://www.mongodb.com/docs/atlas/get
 >
 > Identidade, rede e arquitetura resolvem problemas diferentes.
 
-| Conceito | Resolve | Não garante |
-|---|---|---|
-| Atlas user | administração da plataforma | login da aplicação na database |
-| Database user | autenticação no MongoDB | origem de rede permitida |
-| Network Access | alcance de rede | autorização sobre collections |
-| Replica set | redundância/alta disponibilidade | distribuição horizontal do dataset |
-| Sharded cluster | distribuição do dataset | backup histórico |
+| Conceito        | Resolve                          | Não garante                        |
+| --------------- | -------------------------------- | ---------------------------------- |
+| Atlas user      | administração da plataforma      | login da aplicação na database     |
+| Database user   | autenticação no MongoDB          | origem de rede permitida           |
+| Network Access  | alcance de rede                  | autorização sobre collections      |
+| Replica set     | redundância/alta disponibilidade | distribuição horizontal do dataset |
+| Sharded cluster | distribuição do dataset          | backup histórico                   |
 
 > **Ligação entre capítulos:** connection strings e `authSource` aparecem no capítulo 03; `MongoClient` e TLS no capítulo 04; índices e targeting no capítulo 09.
 
 ### Fluxo de diagnóstico Atlas
 
-~~~text
+```text
 A aplicação chega ao hostname?
   |-- não --> DNS / região / Network Access
   `-- sim --> TLS completa?
@@ -320,7 +327,7 @@ A aplicação chega ao hostname?
                               `-- sim --> operação autorizada?
                                             |-- não --> roles
                                             `-- sim --> analisar query/performance
-~~~
+```
 
 ### Mini desafio
 

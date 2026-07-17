@@ -16,22 +16,22 @@ Uma connection string descreve **como descobrir e autenticar uma ligação**, n�
 
 ### Standard versus SRV
 
-| Característica | `mongodb://` | `mongodb+srv://` |
-|---|---|---|
-| Hosts | listados na URI | descobertos por DNS SRV |
-| Porta | explícita/opcional | não é indicada na URI |
-| Topologia | seed list manual | seed list obtida por DNS |
-| Opções DNS TXT | não | sim |
-| TLS por defeito | não necessariamente | sim |
-| Uso Atlas | possível | formato normal recomendado |
+| Característica  | `mongodb://`        | `mongodb+srv://`           |
+| --------------- | ------------------- | -------------------------- |
+| Hosts           | listados na URI     | descobertos por DNS SRV    |
+| Porta           | explícita/opcional  | não é indicada na URI      |
+| Topologia       | seed list manual    | seed list obtida por DNS   |
+| Opções DNS TXT  | não                 | sim                        |
+| TLS por defeito | não necessariamente | sim                        |
+| Uso Atlas       | possível            | formato normal recomendado |
 
 Uma seed list não é uma lista de ligações fixas. O driver contacta seeds para descobrir a topologia real e monitoriza alterações.
 
 ### Anatomia
 
-~~~text
+```text
 mongodb://username:password@host1:27017,host2:27017/app?replicaSet=rs0&authSource=admin
-~~~
+```
 
 - **scheme:** identifica o formato.
 - **userinfo:** credenciais; deve ser omitido quando o mecanismo usa identidade externa.
@@ -90,47 +90,47 @@ O driver mantém uma visão da topologia. Para cada operação, filtra servidore
 
 ### Formato standard
 
-~~~text
+```text
 mongodb://[username:password@]host1[:port1][,hostN[:portN]]/[defaultAuthDb][?options]
-~~~
+```
 
 ### Formato SRV
 
-~~~text
+```text
 mongodb+srv://[username:password@]host[/[defaultAuthDb][?options]]
-~~~
+```
 
 ### Opções frequentes
 
-| Opção | Significado | Nota |
-|---|---|---|
-| `replicaSet` | nome esperado do replica set | relevante no formato standard |
-| `authSource` | database de autenticação | não é autorização |
-| `retryWrites` | retry de writes elegíveis | depende da topologia/operação |
-| `retryReads` | retry de reads elegíveis | não torna lógica arbitrária idempotente |
-| `w` | write concern acknowledgement | `majority` privilegia durabilidade |
-| `readPreference` | routing de reads | default `primary` |
-| `appName` | identificação observável | aparece em logs/profiling |
-| `tls` | TLS | implicitamente true em SRV |
+| Opção            | Significado                   | Nota                                    |
+| ---------------- | ----------------------------- | --------------------------------------- |
+| `replicaSet`     | nome esperado do replica set  | relevante no formato standard           |
+| `authSource`     | database de autenticação      | não é autorização                       |
+| `retryWrites`    | retry de writes elegíveis     | depende da topologia/operação           |
+| `retryReads`     | retry de reads elegíveis      | não torna lógica arbitrária idempotente |
+| `w`              | write concern acknowledgement | `majority` privilegia durabilidade      |
+| `readPreference` | routing de reads              | default `primary`                       |
+| `appName`        | identificação observável      | aparece em logs/profiling               |
+| `tls`            | TLS                           | implicitamente true em SRV              |
 
 ### Invocar mongosh
 
-~~~bash
+```bash
 mongosh "$MONGODB_URI"
-~~~
+```
 
 Não colocar a URI literal no histórico do shell. Se a password tiver sido exposta, removê-la do ficheiro não apaga o histórico: deve ser rodada.
 
 ### Métodos essenciais em mongosh
 
-~~~mongosh
+```mongosh
 db.getName()
 db.getCollectionNames()
 db.movies.find({ year: { $gte: 2000 } }).limit(5)
 db.movies.findOne({ title: "The Matrix" })
 db.movies.countDocuments({ genres: "Drama" })
 db.movies.explain("executionStats").find({ title: "The Matrix" })
-~~~
+```
 
 ---
 
@@ -138,44 +138,49 @@ db.movies.explain("executionStats").find({ title: "The Matrix" })
 
 ### Exemplo 1 — construir uma URI standard sem corromper componentes
 
-~~~javascript
+```javascript
 /**
  * Constrói uma URI de laboratório a partir de componentes controlados.
  * Em produção, é preferível receber a URI completa de um secret manager.
  */
 function buildMongoUri({ username, password, hosts, authSource }) {
-  const encodedUsername = encodeURIComponent(username);
-  const encodedPassword = encodeURIComponent(password);
-  const seedList = hosts.join(",");
-  const params = new URLSearchParams({
-    replicaSet: "rs0",
-    authSource,
-    retryWrites: "true",
-    w: "majority"
-  });
+    const encodedUsername = encodeURIComponent(username);
+    const encodedPassword = encodeURIComponent(password);
+    const seedList = hosts.join(",");
+    const params = new URLSearchParams({
+        replicaSet: "rs0",
+        authSource,
+        retryWrites: "true",
+        w: "majority",
+    });
 
-  return "mongodb://" +
-    encodedUsername + ":" +
-    encodedPassword + "@" +
-    seedList + "/app?" +
-    params.toString();
+    return (
+        "mongodb://" +
+        encodedUsername +
+        ":" +
+        encodedPassword +
+        "@" +
+        seedList +
+        "/app?" +
+        params.toString()
+    );
 }
 
 const uri = buildMongoUri({
-  username: "app-user",
-  password: "p@ss:word/with?reserved",
-  hosts: ["db1.example.net:27017", "db2.example.net:27017"],
-  authSource: "admin"
+    username: "app-user",
+    password: "p@ss:word/with?reserved",
+    hosts: ["db1.example.net:27017", "db2.example.net:27017"],
+    authSource: "admin",
 });
 
 console.log(uri);
-~~~
+```
 
 Resultado: os caracteres reservados nas credenciais aparecem codificados; os separadores estruturais mantêm-se.
 
 ### Exemplo 2 — exploração segura em mongosh
 
-~~~mongosh
+```mongosh
 use sample_mflix
 
 const filter = {
@@ -188,13 +193,13 @@ db.movies
   .find(filter, { _id: 0, title: 1, year: 1, "imdb.rating": 1 })
   .sort({ "imdb.rating": -1, title: 1 })
   .limit(10);
-~~~
+```
 
 Resultado: até dez dramas do intervalo, com rating elevado, ordenados por rating e título.
 
 ### Exemplo 3 — diagnosticar um plano
 
-~~~mongosh
+```mongosh
 use sample_mflix
 
 const plan = db.movies
@@ -208,17 +213,17 @@ printjson({
   totalDocsExamined: plan.executionStats.totalDocsExamined,
   nReturned: plan.executionStats.nReturned
 });
-~~~
+```
 
 Resultado: resumo do plano e métricas reais dessa execução. Um `COLLSCAN` examina documentos; um `IXSCAN` usa índice, frequentemente seguido de `FETCH`.
 
 ### Exemplo 4 — ligação shell sem expor password no argumento
 
-~~~bash
+```bash
 mongosh "mongodb+srv://cluster.example.net/sample_mflix" \
   --username "study-user" \
   --authenticationDatabase "admin"
-~~~
+```
 
 Resultado: `mongosh` pede a password interativamente sem a incluir na URI nem no argumento. Para automação, usar um mecanismo e um secret manager suportados em vez de prompts.
 
@@ -335,19 +340,19 @@ Fontes oficiais: [connection strings](https://www.mongodb.com/docs/manual/refere
 >
 > O esquema da URI muda discovery e defaults, não a linguagem de query.
 
-| Aspeto | `mongodb://` | `mongodb+srv://` |
-|---|---|---|
-| seeds | explícitas na URI | descobertas por DNS SRV |
-| opções DNS | não | pode usar TXT |
-| TLS default | depende da opção/contexto | ativado por defeito |
-| porta na URI | pode ser explícita | não se indica no hostname SRV |
-| uso Atlas | possível | formato habitual |
+| Aspeto       | `mongodb://`              | `mongodb+srv://`              |
+| ------------ | ------------------------- | ----------------------------- |
+| seeds        | explícitas na URI         | descobertas por DNS SRV       |
+| opções DNS   | não                       | pode usar TXT                 |
+| TLS default  | depende da opção/contexto | ativado por defeito           |
+| porta na URI | pode ser explícita        | não se indica no hostname SRV |
+| uso Atlas    | possível                  | formato habitual              |
 
 > **Ligação entre capítulos:** Network Access e database users estão no capítulo 01; pools e timeouts do client no capítulo 04; `explain` e índices no capítulo 09.
 
 ### Mapa de interpretação da URI
 
-~~~text
+```text
 mongodb+srv://user:password@host/app?retryWrites=true&w=majority
 |              |             |    |   `-- options
 |              |             |    `------ default database
@@ -356,7 +361,7 @@ mongodb+srv://user:password@host/app?retryWrites=true&w=majority
 `---------------------------------------- scheme
 
 authSource = origem da autenticação, não autorização nem default database
-~~~
+```
 
 ### Mini desafio
 

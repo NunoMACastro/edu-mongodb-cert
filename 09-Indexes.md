@@ -23,20 +23,20 @@ O benefício em reads tem custos:
 
 ### Tipos e propriedades
 
-| Tipo/propriedade | Finalidade | Limitação/nota |
-|---|---|---|
-| single-field | filtro/sort num campo | simples e reutilizável |
-| compound | vários campos e sorts | ordem dos campos é decisiva |
-| multikey | indexar elementos de arrays | restrições em arrays compostos/cobertura |
-| unique | impor unicidade | constraint, não só performance |
-| partial | indexar documentos que passam expressão | query deve implicar o filtro |
-| sparse | omitir documentos sem campo | partial é geralmente mais expressivo |
-| TTL | expirar por campo Date | remoção assíncrona, não SLA exato |
-| text | `$text` clássico | MongoDB Search é solução diferente |
-| 2d/2dsphere | geospatial | formato/query específicos |
-| hashed | igualdade e hashed sharding | não suporta ranges ordenados |
-| wildcard | paths desconhecidos/flexíveis | não substitui desenho focado |
-| clustered | ordem física de clustered collection | criação/limites específicos |
+| Tipo/propriedade | Finalidade                              | Limitação/nota                           |
+| ---------------- | --------------------------------------- | ---------------------------------------- |
+| single-field     | filtro/sort num campo                   | simples e reutilizável                   |
+| compound         | vários campos e sorts                   | ordem dos campos é decisiva              |
+| multikey         | indexar elementos de arrays             | restrições em arrays compostos/cobertura |
+| unique           | impor unicidade                         | constraint, não só performance           |
+| partial          | indexar documentos que passam expressão | query deve implicar o filtro             |
+| sparse           | omitir documentos sem campo             | partial é geralmente mais expressivo     |
+| TTL              | expirar por campo Date                  | remoção assíncrona, não SLA exato        |
+| text             | `$text` clássico                        | MongoDB Search é solução diferente       |
+| 2d/2dsphere      | geospatial                              | formato/query específicos                |
+| hashed           | igualdade e hashed sharding             | não suporta ranges ordenados             |
+| wildcard         | paths desconhecidos/flexíveis           | não substitui desenho focado             |
+| clustered        | ordem física de clustered collection    | criação/limites específicos              |
 
 ### Compound index e prefixos
 
@@ -58,16 +58,15 @@ Heurística para compound indexes:
 
 Exemplo de workload:
 
-~~~javascript
-find({ status: "paid", total: { $gte: 100 } })
-  .sort({ createdAt: -1 })
-~~~
+```javascript
+find({ status: "paid", total: { $gte: 100 } }).sort({ createdAt: -1 });
+```
 
 Índice candidato:
 
-~~~javascript
+```javascript
 const candidateIndex = { status: 1, createdAt: -1, total: 1 };
-~~~
+```
 
 ESR é uma heurística. Se o range for extremamente seletivo, ERS pode ser melhor. Medir com dados representativos e `explain`.
 
@@ -113,58 +112,58 @@ O planner pode combinar índices, mas um compound index alinhado com o access pa
 
 ### Criar índices
 
-~~~javascript
+```javascript
 await collection.createIndex(
-  { status: 1, createdAt: -1 },
-  { name: "status_createdAt_desc" }
+    { status: 1, createdAt: -1 },
+    { name: "status_createdAt_desc" },
 );
 
 await collection.createIndexes([
-  {
-    key: { email: 1 },
-    name: "email_unique",
-    unique: true
-  },
-  {
-    key: { expiresAt: 1 },
-    name: "expires_ttl",
-    expireAfterSeconds: 0
-  }
+    {
+        key: { email: 1 },
+        name: "email_unique",
+        unique: true,
+    },
+    {
+        key: { expiresAt: 1 },
+        name: "expires_ttl",
+        expireAfterSeconds: 0,
+    },
 ]);
-~~~
+```
 
 ### Partial index
 
-~~~javascript
+```javascript
 await users.createIndex(
-  { email: 1 },
-  {
-    name: "active_email_unique",
-    unique: true,
-    partialFilterExpression: { deletedAt: { $exists: false } }
-  }
+    { email: 1 },
+    {
+        name: "active_email_unique",
+        unique: true,
+        partialFilterExpression: { deletedAt: { $exists: false } },
+    },
 );
-~~~
+```
 
 Isto impõe unicidade apenas entre documentos abrangidos. A semântica deve ser deliberada: documentos soft-deleted podem reutilizar email.
 
 ### Listar e remover
 
-~~~javascript
+```javascript
 const indexes = await collection.listIndexes().toArray();
 await collection.dropIndex("status_createdAt_desc");
-~~~
+```
 
 Remover índice em produção requer confirmar queries dependentes e plano de rollback. Ocultar um índice, quando suportado, permite testar o efeito antes de o apagar.
 
 ### Explain no driver
 
-~~~javascript
+```javascript
 const plan = await collection
-  .find(filter, { projection })
-  .sort(sort)
-  .explain("executionStats");
-~~~
+    .find(filter, { projection })
+    .sort(sort)
+    .explain("executionStats");
+```
 
 Modos comuns: `"queryPlanner"`, `"executionStats"` e `"allPlansExecution"`. O último acrescenta custo de diagnóstico.
 
@@ -174,7 +173,7 @@ Modos comuns: `"queryPlanner"`, `"executionStats"` e `"allPlansExecution"`. O ú
 
 ### Exemplo 1 — compound index para filtro e sort
 
-~~~javascript
+```javascript
 /**
  * @file Cria e confirma um índice alinhado com listagem de encomendas.
  */
@@ -183,32 +182,32 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const orders = client.db("shop").collection("orders");
-  await orders.createIndex(
-    { customerId: 1, status: 1, createdAt: -1 },
-    { name: "customer_status_createdAt" }
-  );
+    const orders = client.db("shop").collection("orders");
+    await orders.createIndex(
+        { customerId: 1, status: 1, createdAt: -1 },
+        { name: "customer_status_createdAt" },
+    );
 
-  const plan = await orders
-    .find(
-      { customerId: "customer-42", status: "paid" },
-      { projection: { _id: 0, orderNumber: 1, createdAt: 1 } }
-    )
-    .sort({ createdAt: -1 })
-    .limit(20)
-    .explain("executionStats");
+    const plan = await orders
+        .find(
+            { customerId: "customer-42", status: "paid" },
+            { projection: { _id: 0, orderNumber: 1, createdAt: 1 } },
+        )
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .explain("executionStats");
 
-  console.log(plan.executionStats);
+    console.log(plan.executionStats);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: o winning plan deve ser inspecionado; espera-se que o índice possa filtrar e ordenar.
 
 ### Exemplo 2 — covered query
 
-~~~javascript
+```javascript
 /**
  * @file Demonstra uma query que pode ser respondida só pelo índice.
  */
@@ -217,34 +216,34 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  await movies.createIndex(
-    { title: 1, year: 1 },
-    { name: "title_year_cover" }
-  );
+    const movies = client.db("sample_mflix").collection("movies");
+    await movies.createIndex(
+        { title: 1, year: 1 },
+        { name: "title_year_cover" },
+    );
 
-  const plan = await movies
-    .find(
-      { title: "The Matrix" },
-      { projection: { _id: 0, title: 1, year: 1 } }
-    )
-    .explain("executionStats");
+    const plan = await movies
+        .find(
+            { title: "The Matrix" },
+            { projection: { _id: 0, title: 1, year: 1 } },
+        )
+        .explain("executionStats");
 
-  console.log({
-    returned: plan.executionStats.nReturned,
-    keys: plan.executionStats.totalKeysExamined,
-    documents: plan.executionStats.totalDocsExamined
-  });
+    console.log({
+        returned: plan.executionStats.nReturned,
+        keys: plan.executionStats.totalKeysExamined,
+        documents: plan.executionStats.totalDocsExamined,
+    });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado esperado para cobertura: `totalDocsExamined` igual a 0.
 
 ### Exemplo 3 — multikey e `$elemMatch`
 
-~~~javascript
+```javascript
 /**
  * @file Indexa subcampos de um array de linhas e analisa a query.
  */
@@ -253,34 +252,34 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const orders = client.db("shop").collection("orders");
-  await orders.createIndex(
-    { "items.sku": 1, "items.quantity": 1 },
-    { name: "items_sku_quantity" }
-  );
+    const orders = client.db("shop").collection("orders");
+    await orders.createIndex(
+        { "items.sku": 1, "items.quantity": 1 },
+        { name: "items_sku_quantity" },
+    );
 
-  const plan = await orders
-    .find({
-      items: {
-        $elemMatch: {
-          sku: "BOOK-001",
-          quantity: { $gte: 2 }
-        }
-      }
-    })
-    .explain("executionStats");
+    const plan = await orders
+        .find({
+            items: {
+                $elemMatch: {
+                    sku: "BOOK-001",
+                    quantity: { $gte: 2 },
+                },
+            },
+        })
+        .explain("executionStats");
 
-  console.log(plan.queryPlanner.winningPlan);
+    console.log(plan.queryPlanner.winningPlan);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: índice multikey; `$elemMatch` mantém as condições ligadas ao mesmo subdocumento.
 
 ### Exemplo 4 — TTL para sessões
 
-~~~javascript
+```javascript
 /**
  * @file Configura expiração automática baseada numa data absoluta.
  */
@@ -289,20 +288,20 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const sessions = client.db("app").collection("sessions");
-  const indexName = await sessions.createIndex(
-    { expiresAt: 1 },
-    {
-      name: "sessions_expiry",
-      expireAfterSeconds: 0
-    }
-  );
+    const sessions = client.db("app").collection("sessions");
+    const indexName = await sessions.createIndex(
+        { expiresAt: 1 },
+        {
+            name: "sessions_expiry",
+            expireAfterSeconds: 0,
+        },
+    );
 
-  console.log(indexName);
+    console.log(indexName);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: documentos tornam-se elegíveis para remoção após `expiresAt`; a remoção não ocorre exatamente nesse milissegundo.
 
@@ -357,12 +356,12 @@ Resultado: documentos tornam-se elegíveis para remoção após `expiresAt`; a r
 
 Índice eficiente maximiza seletividade e suporta sort/projection. Comparar:
 
-~~~text
+```text
 nReturned
 totalKeysExamined
 totalDocsExamined
 executionTimeMillis
-~~~
+```
 
 Métricas ideais dependem da query. Uma query que devolve 100 mil documentos tem inevitavelmente custo elevado. O objetivo não é “usar IXSCAN”, mas minimizar trabalho para o resultado necessário.
 
@@ -430,20 +429,20 @@ Fontes oficiais: [indexes](https://www.mongodb.com/docs/manual/indexes/), [index
 >
 > Estas propriedades descrevem e restringem índices de formas diferentes.
 
-| Conceito | Define | Pergunta-chave |
-|---|---|---|
-| single-field | uma key | a query usa esse field? |
-| compound | várias keys ordenadas | qual é o prefixo e a ordem? |
-| multikey | indexa elementos de array | que bounds podem ser combinados? |
-| unique | constraint entre documentos | que duplicação é proibida? |
-| partial | subset por expressão | a query implica o filtro parcial? |
-| covered query | resposta só pelo índice | existe `FETCH`/docs examinados? |
+| Conceito      | Define                      | Pergunta-chave                    |
+| ------------- | --------------------------- | --------------------------------- |
+| single-field  | uma key                     | a query usa esse field?           |
+| compound      | várias keys ordenadas       | qual é o prefixo e a ordem?       |
+| multikey      | indexa elementos de array   | que bounds podem ser combinados?  |
+| unique        | constraint entre documentos | que duplicação é proibida?        |
+| partial       | subset por expressão        | a query implica o filtro parcial? |
+| covered query | resposta só pelo índice     | existe `FETCH`/docs examinados?   |
 
 > **Ligação entre capítulos:** access patterns e arrays vêm dos capítulos 02 e 05; sort/projection do 07; stages iniciais de aggregation do 10.
 
 ### Fluxograma: preciso de um índice?
 
-~~~text
+```text
 Existe access pattern ou constraint frequente?
   |-- não --> não criar por antecipação
   `-- sim --> equality / sort / range conhecidos?
@@ -455,7 +454,7 @@ Existe access pattern ou constraint frequente?
                               |
                               +-> pouco trabalho: manter/governar
                               `-> muito trabalho: rever índice/query/modelo
-~~~
+```
 
 ### Mini desafio
 

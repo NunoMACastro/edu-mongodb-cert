@@ -37,9 +37,9 @@ Transações multi-documento exigem replica set ou sharded cluster; standalone n
 
 ### Core API versus Convenient API
 
-| API | Responsabilidade |
-|---|---|
-| Core | `startTransaction`, commit, abort e retry logic manual |
+| API        | Responsabilidade                                                            |
+| ---------- | --------------------------------------------------------------------------- |
+| Core       | `startTransaction`, commit, abort e retry logic manual                      |
 | Convenient | `withTransaction` faz commit/abort e retries de erros transientes elegíveis |
 
 Preferir `withTransaction()` salvo necessidade específica. Mesmo com a API conveniente, validar resultados dentro da callback.
@@ -81,13 +81,13 @@ Transações longas retêm snapshots, aumentam pressão de cache e podem atrasar
 
 Combinação típica:
 
-~~~javascript
+```javascript
 const transactionOptions = {
-  readPreference: "primary",
-  readConcern: { level: "snapshot" },
-  writeConcern: { w: "majority" }
+    readPreference: "primary",
+    readConcern: { level: "snapshot" },
+    writeConcern: { w: "majority" },
 };
-~~~
+```
 
 Escolher garantias pelo domínio. Dentro de transação, evitar alterar concerns por operação; configurar transaction options.
 
@@ -97,54 +97,49 @@ Escolher garantias pelo domínio. Dentro de transação, evitar alterar concerns
 
 ### Convenient Transaction API
 
-~~~javascript
+```javascript
 const session = client.startSession();
 
 try {
-  const result = await session.withTransaction(
-    async () => {
-      const first = await collectionA.updateOne(
-        filterA,
-        updateA,
-        { session }
-      );
+    const result = await session.withTransaction(
+        async () => {
+            const first = await collectionA.updateOne(filterA, updateA, {
+                session,
+            });
 
-      const second = await collectionB.insertOne(
-        documentB,
-        { session }
-      );
+            const second = await collectionB.insertOne(documentB, { session });
 
-      return { first, second };
-    },
-    {
-      readPreference: "primary",
-      readConcern: { level: "snapshot" },
-      writeConcern: { w: "majority" },
-      maxCommitTimeMS: 5_000
-    }
-  );
+            return { first, second };
+        },
+        {
+            readPreference: "primary",
+            readConcern: { level: "snapshot" },
+            writeConcern: { w: "majority" },
+            maxCommitTimeMS: 5_000,
+        },
+    );
 
-  console.log(result);
+    console.log(result);
 } finally {
-  await session.endSession();
+    await session.endSession();
 }
-~~~
+```
 
 ### Core API
 
-~~~javascript
+```javascript
 session.startTransaction(options);
 
 try {
-  await collection.updateOne(filter, update, { session });
-  await session.commitTransaction();
+    await collection.updateOne(filter, update, { session });
+    await session.commitTransaction();
 } catch (error) {
-  await session.abortTransaction();
-  throw error;
+    await session.abortTransaction();
+    throw error;
 } finally {
-  await session.endSession();
+    await session.endSession();
 }
-~~~
+```
 
 Este esqueleto não implementa os retries exigidos para todos os labels; por isso a Convenient API é mais segura como default.
 
@@ -152,12 +147,12 @@ Este esqueleto não implementa os retries exigidos para todos os labels; por iss
 
 Não usar:
 
-~~~javascript
+```javascript
 await Promise.all([
-  collectionA.updateOne(filterA, updateA, { session }),
-  collectionB.updateOne(filterB, updateB, { session })
+    collectionA.updateOne(filterA, updateA, { session }),
+    collectionB.updateOne(filterB, updateB, { session }),
 ]);
-~~~
+```
 
 O Node.js Driver não suporta operações paralelas numa única transação. Executá-las sequencialmente.
 
@@ -167,7 +162,7 @@ O Node.js Driver não suporta operações paralelas numa única transação. Exe
 
 ### Exemplo 1 — transferência atómica
 
-~~~javascript
+```javascript
 /**
  * @file Transfere um valor entre contas e regista o movimento.
  */
@@ -181,68 +176,70 @@ const negativeAmount = Decimal128.fromString("-50.00");
 const transferId = new ObjectId();
 
 try {
-  const database = client.db("bank");
-  const accounts = database.collection("accounts");
-  const transfers = database.collection("transfers");
-  const session = client.startSession();
+    const database = client.db("bank");
+    const accounts = database.collection("accounts");
+    const transfers = database.collection("transfers");
+    const session = client.startSession();
 
-  try {
-    await session.withTransaction(
-      async () => {
-        const debit = await accounts.updateOne(
-          {
-            _id: fromAccountId,
-            balance: { $gte: amount }
-          },
-          { $inc: { balance: negativeAmount } },
-          { session }
+    try {
+        await session.withTransaction(
+            async () => {
+                const debit = await accounts.updateOne(
+                    {
+                        _id: fromAccountId,
+                        balance: { $gte: amount },
+                    },
+                    { $inc: { balance: negativeAmount } },
+                    { session },
+                );
+
+                if (debit.modifiedCount !== 1) {
+                    throw new Error(
+                        "Conta de origem inexistente ou saldo insuficiente.",
+                    );
+                }
+
+                const credit = await accounts.updateOne(
+                    { _id: toAccountId },
+                    { $inc: { balance: amount } },
+                    { session },
+                );
+
+                if (credit.modifiedCount !== 1) {
+                    throw new Error("Conta de destino inexistente.");
+                }
+
+                await transfers.insertOne(
+                    {
+                        _id: transferId,
+                        fromAccountId,
+                        toAccountId,
+                        amount,
+                        createdAt: new Date(),
+                    },
+                    { session },
+                );
+            },
+            {
+                readPreference: "primary",
+                readConcern: { level: "snapshot" },
+                writeConcern: { w: "majority" },
+                maxCommitTimeMS: 5_000,
+            },
         );
-
-        if (debit.modifiedCount !== 1) {
-          throw new Error("Conta de origem inexistente ou saldo insuficiente.");
-        }
-
-        const credit = await accounts.updateOne(
-          { _id: toAccountId },
-          { $inc: { balance: amount } },
-          { session }
-        );
-
-        if (credit.modifiedCount !== 1) {
-          throw new Error("Conta de destino inexistente.");
-        }
-
-        await transfers.insertOne(
-          {
-            _id: transferId,
-            fromAccountId,
-            toAccountId,
-            amount,
-            createdAt: new Date()
-          },
-          { session }
-        );
-      },
-      {
-        readPreference: "primary",
-        readConcern: { level: "snapshot" },
-        writeConcern: { w: "majority" },
-        maxCommitTimeMS: 5_000
-      }
-    );
-  } finally {
-    await session.endSession();
-  }
+    } finally {
+        await session.endSession();
+    }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: débito, crédito e ledger commitam juntos ou são abortados.
 
 ### Exemplo 2 — reservar inventário e criar encomenda
 
-~~~javascript
+```javascript
 /**
  * @file Cria encomenda apenas quando existe stock suficiente.
  */
@@ -254,48 +251,48 @@ const orderId = new ObjectId();
 const quantity = 2;
 
 try {
-  const database = client.db("shop");
-  const inventory = database.collection("inventory");
-  const orders = database.collection("orders");
-  const session = client.startSession();
+    const database = client.db("shop");
+    const inventory = database.collection("inventory");
+    const orders = database.collection("orders");
+    const session = client.startSession();
 
-  try {
-    const createdOrder = await session.withTransaction(async () => {
-      const stockResult = await inventory.updateOne(
-        { productId, available: { $gte: quantity } },
-        { $inc: { available: -quantity, reserved: quantity } },
-        { session }
-      );
+    try {
+        const createdOrder = await session.withTransaction(async () => {
+            const stockResult = await inventory.updateOne(
+                { productId, available: { $gte: quantity } },
+                { $inc: { available: -quantity, reserved: quantity } },
+                { session },
+            );
 
-      if (stockResult.modifiedCount !== 1) {
-        throw new Error("Stock insuficiente.");
-      }
+            if (stockResult.modifiedCount !== 1) {
+                throw new Error("Stock insuficiente.");
+            }
 
-      const order = {
-        _id: orderId,
-        status: "reserved",
-        items: [{ productId, quantity }],
-        createdAt: new Date()
-      };
+            const order = {
+                _id: orderId,
+                status: "reserved",
+                items: [{ productId, quantity }],
+                createdAt: new Date(),
+            };
 
-      await orders.insertOne(order, { session });
-      return order;
-    });
+            await orders.insertOne(order, { session });
+            return order;
+        });
 
-    console.log(createdOrder);
-  } finally {
-    await session.endSession();
-  }
+        console.log(createdOrder);
+    } finally {
+        await session.endSession();
+    }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: stock e encomenda mantêm-se coerentes; a callback pode repetir e não contém side effects externos.
 
 ### Exemplo 3 — padrão outbox
 
-~~~javascript
+```javascript
 /**
  * @file Grava a alteração de domínio e uma mensagem outbox na mesma transação.
  */
@@ -305,47 +302,47 @@ const client = new MongoClient(process.env.MONGODB_URI);
 const orderId = new ObjectId(process.env.ORDER_ID);
 
 try {
-  const database = client.db("shop");
-  const orders = database.collection("orders");
-  const outbox = database.collection("outbox");
-  const session = client.startSession();
+    const database = client.db("shop");
+    const orders = database.collection("orders");
+    const outbox = database.collection("outbox");
+    const session = client.startSession();
 
-  try {
-    await session.withTransaction(async () => {
-      const order = await orders.findOneAndUpdate(
-        { _id: orderId, status: "reserved" },
-        {
-          $set: {
-            status: "confirmed",
-            confirmedAt: new Date()
-          }
-        },
-        { session, returnDocument: "after" }
-      );
+    try {
+        await session.withTransaction(async () => {
+            const order = await orders.findOneAndUpdate(
+                { _id: orderId, status: "reserved" },
+                {
+                    $set: {
+                        status: "confirmed",
+                        confirmedAt: new Date(),
+                    },
+                },
+                { session, returnDocument: "after" },
+            );
 
-      if (!order) {
-        throw new Error("Encomenda inexistente ou estado inválido.");
-      }
+            if (!order) {
+                throw new Error("Encomenda inexistente ou estado inválido.");
+            }
 
-      await outbox.insertOne(
-        {
-          eventId: new ObjectId(),
-          type: "order.confirmed",
-          aggregateId: order._id,
-          payload: { orderId: order._id },
-          publishedAt: null,
-          createdAt: new Date()
-        },
-        { session }
-      );
-    });
-  } finally {
-    await session.endSession();
-  }
+            await outbox.insertOne(
+                {
+                    eventId: new ObjectId(),
+                    type: "order.confirmed",
+                    aggregateId: order._id,
+                    payload: { orderId: order._id },
+                    publishedAt: null,
+                    createdAt: new Date(),
+                },
+                { session },
+            );
+        });
+    } finally {
+        await session.endSession();
+    }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: a mensagem só existe se a alteração de encomenda commitar. Outro worker publica-a com idempotência.
 
@@ -467,19 +464,19 @@ Fontes oficiais: [transactions no driver](https://www.mongodb.com/docs/drivers/n
 >
 > A necessidade de coordenação determina o mecanismo.
 
-| Situação | Mecanismo preferido | Razão |
-|---|---|---|
-| um documento | write normal | já é atómico |
-| vários documentos, all-or-nothing | transação | invariante multi-documento |
-| sistema externo + MongoDB | idempotência/outbox/saga | transação não inclui API externa |
-| API conveniente | `withTransaction()` | retries/commit/abort geridos |
-| controlo manual específico | Core API | retry logic fica na aplicação |
+| Situação                          | Mecanismo preferido      | Razão                            |
+| --------------------------------- | ------------------------ | -------------------------------- |
+| um documento                      | write normal             | já é atómico                     |
+| vários documentos, all-or-nothing | transação                | invariante multi-documento       |
+| sistema externo + MongoDB         | idempotência/outbox/saga | transação não inclui API externa |
+| API conveniente                   | `withTransaction()`      | retries/commit/abort geridos     |
+| controlo manual específico        | Core API                 | retry logic fica na aplicação    |
 
 > **Ligação entre capítulos:** modelação/embedding está no capítulo 02; unique indexes no 09; lifecycle do client no 04.
 
 ### Fluxograma: preciso de transação?
 
-~~~text
+```text
 A invariante cabe num único documento?
   |-- sim --> write single-document atómico
   `-- não --> estado intermédio é aceitável?
@@ -487,7 +484,7 @@ A invariante cabe num único documento?
                 `-- não --> todos os recursos estão no mesmo deployment MongoDB?
                               |-- sim --> transação curta
                               `-- não --> outbox / saga / compensação
-~~~
+```
 
 ### Mini desafio
 

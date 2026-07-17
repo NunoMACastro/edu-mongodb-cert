@@ -14,23 +14,23 @@
 
 No driver, uma pipeline é um array de plain objects e `collection.aggregate(pipeline, options)` devolve um `AggregationCursor`. A chamada não devolve imediatamente o array final.
 
-~~~javascript
+```javascript
 const cursor = collection.aggregate(pipeline, options);
-~~~
+```
 
 Depois:
 
-~~~javascript
+```javascript
 const results = await cursor.toArray();
-~~~
+```
 
 ou:
 
-~~~javascript
+```javascript
 for await (const document of cursor) {
-  // processar um documento de cada vez
+    // processar um documento de cada vez
 }
-~~~
+```
 
 ### aggregate versus find no driver
 
@@ -92,15 +92,15 @@ Explain mostra o plano dos stages que usam o query engine e estatísticas quando
 
 ### API principal
 
-~~~javascript
+```javascript
 const cursor = collection.aggregate(pipeline, {
-  allowDiskUse: true,
-  batchSize: 100,
-  maxTimeMS: 10_000,
-  comment: "sales-summary",
-  hint: { saleDate: 1 }
+    allowDiskUse: true,
+    batchSize: 100,
+    maxTimeMS: 10_000,
+    comment: "sales-summary",
+    hint: { saleDate: 1 },
 });
-~~~
+```
 
 - `pipeline`: array ordered de stages.
 - `allowDiskUse`: permite spill para stages elegíveis.
@@ -111,33 +111,33 @@ const cursor = collection.aggregate(pipeline, {
 
 ### Builder puro
 
-~~~javascript
+```javascript
 /**
  * Cria uma pipeline de receita por localização.
  */
 function buildRevenuePipeline({ start, end, minimumRevenue }) {
-  return [
-    {
-      $match: {
-        saleDate: { $gte: start, $lt: end }
-      }
-    },
-    { $unwind: "$items" },
-    {
-      $group: {
-        _id: "$storeLocation",
-        revenue: {
-          $sum: {
-            $multiply: ["$items.price", "$items.quantity"]
-          }
-        }
-      }
-    },
-    { $match: { revenue: { $gte: minimumRevenue } } },
-    { $sort: { revenue: -1, _id: 1 } }
-  ];
+    return [
+        {
+            $match: {
+                saleDate: { $gte: start, $lt: end },
+            },
+        },
+        { $unwind: "$items" },
+        {
+            $group: {
+                _id: "$storeLocation",
+                revenue: {
+                    $sum: {
+                        $multiply: ["$items.price", "$items.quantity"],
+                    },
+                },
+            },
+        },
+        { $match: { revenue: { $gte: minimumRevenue } } },
+        { $sort: { revenue: -1, _id: 1 } },
+    ];
 }
-~~~
+```
 
 O primeiro `$match` pode usar o índice da collection. O segundo filtra um campo calculado e não pode ser movido antes do `$group`.
 
@@ -147,7 +147,7 @@ O primeiro `$match` pode usar o índice da collection. O segundo filtra um campo
 
 ### Exemplo 1 — relatório completo e limitado
 
-~~~javascript
+```javascript
 /**
  * @file Calcula as cinco lojas com maior receita num intervalo.
  */
@@ -156,56 +156,58 @@ import { Decimal128, MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const sales = client.db("sample_supplies").collection("sales");
-  const start = new Date("2015-01-01T00:00:00.000Z");
-  const end = new Date("2016-01-01T00:00:00.000Z");
-  const pipeline = [
-    { $match: { saleDate: { $gte: start, $lt: end } } },
-    { $unwind: "$items" },
-    {
-      $group: {
-        _id: "$storeLocation",
-        revenue: {
-          $sum: {
-            $multiply: ["$items.price", "$items.quantity"]
-          }
+    const sales = client.db("sample_supplies").collection("sales");
+    const start = new Date("2015-01-01T00:00:00.000Z");
+    const end = new Date("2016-01-01T00:00:00.000Z");
+    const pipeline = [
+        { $match: { saleDate: { $gte: start, $lt: end } } },
+        { $unwind: "$items" },
+        {
+            $group: {
+                _id: "$storeLocation",
+                revenue: {
+                    $sum: {
+                        $multiply: ["$items.price", "$items.quantity"],
+                    },
+                },
+                units: { $sum: "$items.quantity" },
+            },
         },
-        units: { $sum: "$items.quantity" }
-      }
-    },
-    {
-      $match: {
-        revenue: { $gte: Decimal128.fromString("10000.00") }
-      }
-    },
-    { $sort: { revenue: -1, _id: 1 } },
-    { $limit: 5 },
-    {
-      $project: {
-        _id: 0,
-        storeLocation: "$_id",
-        revenue: 1,
-        units: 1
-      }
-    }
-  ];
+        {
+            $match: {
+                revenue: { $gte: Decimal128.fromString("10000.00") },
+            },
+        },
+        { $sort: { revenue: -1, _id: 1 } },
+        { $limit: 5 },
+        {
+            $project: {
+                _id: 0,
+                storeLocation: "$_id",
+                revenue: 1,
+                units: 1,
+            },
+        },
+    ];
 
-  const report = await sales.aggregate(pipeline, {
-    maxTimeMS: 10_000,
-    comment: "annual-store-revenue"
-  }).toArray();
+    const report = await sales
+        .aggregate(pipeline, {
+            maxTimeMS: 10_000,
+            comment: "annual-store-revenue",
+        })
+        .toArray();
 
-  console.dir(report, { depth: null });
+    console.dir(report, { depth: null });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: no máximo cinco lojas e valores agregados.
 
 ### Exemplo 2 — async iteration de output potencialmente grande
 
-~~~javascript
+```javascript
 /**
  * @file Emite contagens por realizador como JSON Lines.
  */
@@ -214,102 +216,106 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const pipeline = [
-    { $match: { directors: { $type: "array" } } },
-    { $unwind: "$directors" },
-    {
-      $group: {
-        _id: "$directors",
-        movies: { $sum: 1 },
-        averageRating: { $avg: "$imdb.rating" }
-      }
-    },
-    { $sort: { movies: -1, _id: 1 } }
-  ];
+    const movies = client.db("sample_mflix").collection("movies");
+    const pipeline = [
+        { $match: { directors: { $type: "array" } } },
+        { $unwind: "$directors" },
+        {
+            $group: {
+                _id: "$directors",
+                movies: { $sum: 1 },
+                averageRating: { $avg: "$imdb.rating" },
+            },
+        },
+        { $sort: { movies: -1, _id: 1 } },
+    ];
 
-  const cursor = movies.aggregate(pipeline, {
-    allowDiskUse: true,
-    batchSize: 100,
-    maxTimeMS: 30_000
-  });
+    const cursor = movies.aggregate(pipeline, {
+        allowDiskUse: true,
+        batchSize: 100,
+        maxTimeMS: 30_000,
+    });
 
-  try {
-    for await (const row of cursor) {
-      process.stdout.write(JSON.stringify(row) + "\n");
+    try {
+        for await (const row of cursor) {
+            process.stdout.write(JSON.stringify(row) + "\n");
+        }
+    } finally {
+        await cursor.close();
     }
-  } finally {
-    await cursor.close();
-  }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: uma linha por realizador sem materializar todo o resultado no processo.
 
 ### Exemplo 3 — pipeline parametrizada com paginação
 
-~~~javascript
+```javascript
 /**
  * @file Pesquisa catálogo por género com parâmetros validados.
  */
 import { MongoClient } from "mongodb";
 
 const allowedGenres = new Set([
-  "Action",
-  "Comedy",
-  "Documentary",
-  "Drama",
-  "Sci-Fi"
+    "Action",
+    "Comedy",
+    "Documentary",
+    "Drama",
+    "Sci-Fi",
 ]);
 
 const requestedGenre = process.env.GENRE ?? "Drama";
 const requestedLimit = Number.parseInt(process.env.LIMIT ?? "20", 10);
 
 if (!allowedGenres.has(requestedGenre)) {
-  throw new RangeError("Género não permitido.");
+    throw new RangeError("Género não permitido.");
 }
 
-if (!Number.isInteger(requestedLimit) ||
+if (
+    !Number.isInteger(requestedLimit) ||
     requestedLimit < 1 ||
-    requestedLimit > 100) {
-  throw new RangeError("LIMIT deve estar entre 1 e 100.");
+    requestedLimit > 100
+) {
+    throw new RangeError("LIMIT deve estar entre 1 e 100.");
 }
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const pipeline = [
-    { $match: { genres: requestedGenre } },
-    { $sort: { "imdb.rating": -1, _id: 1 } },
-    { $limit: requestedLimit },
-    {
-      $project: {
-        title: 1,
-        year: 1,
-        rating: "$imdb.rating"
-      }
-    }
-  ];
+    const movies = client.db("sample_mflix").collection("movies");
+    const pipeline = [
+        { $match: { genres: requestedGenre } },
+        { $sort: { "imdb.rating": -1, _id: 1 } },
+        { $limit: requestedLimit },
+        {
+            $project: {
+                title: 1,
+                year: 1,
+                rating: "$imdb.rating",
+            },
+        },
+    ];
 
-  const results = await movies.aggregate(pipeline, {
-    maxTimeMS: 3_000,
-    comment: "genre-catalog"
-  }).toArray();
+    const results = await movies
+        .aggregate(pipeline, {
+            maxTimeMS: 3_000,
+            comment: "genre-catalog",
+        })
+        .toArray();
 
-  console.log(results);
+    console.log(results);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: entre 1 e 100 filmes do género permitido; nenhuma chave MQL vem do exterior.
 
 ### Exemplo 4 — `$lookup` no driver
 
-~~~javascript
+```javascript
 /**
  * @file Junta comentários recentes aos filmes sem N+1 queries.
  */
@@ -318,43 +324,43 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const pipeline = [
-    { $match: { title: "The Matrix" } },
-    { $limit: 1 },
-    {
-      $lookup: {
-        from: "comments",
-        let: { movieId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$movie_id", "$$movieId"] }
-            }
-          },
-          { $sort: { date: -1 } },
-          { $limit: 5 },
-          { $project: { _id: 0, name: 1, text: 1, date: 1 } }
-        ],
-        as: "recentComments"
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        title: 1,
-        year: 1,
-        recentComments: 1
-      }
-    }
-  ];
+    const movies = client.db("sample_mflix").collection("movies");
+    const pipeline = [
+        { $match: { title: "The Matrix" } },
+        { $limit: 1 },
+        {
+            $lookup: {
+                from: "comments",
+                let: { movieId: "$_id" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: { $eq: ["$movie_id", "$$movieId"] },
+                        },
+                    },
+                    { $sort: { date: -1 } },
+                    { $limit: 5 },
+                    { $project: { _id: 0, name: 1, text: 1, date: 1 } },
+                ],
+                as: "recentComments",
+            },
+        },
+        {
+            $project: {
+                _id: 0,
+                title: 1,
+                year: 1,
+                recentComments: 1,
+            },
+        },
+    ];
 
-  const movie = await movies.aggregate(pipeline).next();
-  console.dir(movie, { depth: null });
+    const movie = await movies.aggregate(pipeline).next();
+    console.dir(movie, { depth: null });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: um documento com array `recentComments`, ou `null` se não houver filme.
 
@@ -480,18 +486,18 @@ Fontes oficiais: [aggregation no driver](https://www.mongodb.com/docs/drivers/no
 >
 > A forma de consumo muda memória e latência, não a semântica server-side.
 
-| Consumo | Memória no cliente | Adequado a |
-|---|---|---|
-| `next()` | um documento | metadata/primeiro resultado |
-| `toArray()` | todo o restante | output pequeno e limitado |
-| `for await...of` | progressiva por batches | muitos resultados |
-| stream | backpressure de Node streams | integração com pipelines stream |
+| Consumo          | Memória no cliente           | Adequado a                      |
+| ---------------- | ---------------------------- | ------------------------------- |
+| `next()`         | um documento                 | metadata/primeiro resultado     |
+| `toArray()`      | todo o restante              | output pequeno e limitado       |
+| `for await...of` | progressiva por batches      | muitos resultados               |
+| stream           | backpressure de Node streams | integração com pipelines stream |
 
 > **Ligação entre capítulos:** semântica dos stages está no capítulo 10; cursor e client partilhado nos capítulos 04 e 08; tipos BSON no 02.
 
 ### Fluxo seguro de construção
 
-~~~text
+```text
 HTTP parameters
       |
  validar tipo / range / autorização
@@ -504,7 +510,7 @@ collection.aggregate(pipeline, options)
       |
       v
 AggregationCursor -> limitar / iterar / fechar
-~~~
+```
 
 ### Mini desafio
 

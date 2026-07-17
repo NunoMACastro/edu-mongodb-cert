@@ -20,14 +20,14 @@ Todos os documentos de uma collection têm um `_id` único. Se a aplicação nã
 
 ### Embedding versus referencing
 
-| Critério | Embedding | Referencing |
-|---|---|---|
-| Leitura conjunta | uma operação | pode exigir operação adicional ou `$lookup` |
-| Atomicidade | single-document | transação para invariantes multi-documento |
-| Duplicação | possível | menor |
-| Crescimento | limitado pelo documento | entidades crescem separadamente |
-| Relação | “contains”, um-para-poucos | muitos-para-muitos, alta cardinalidade |
-| Atualização partilhada | várias cópias | uma fonte |
+| Critério               | Embedding                  | Referencing                                 |
+| ---------------------- | -------------------------- | ------------------------------------------- |
+| Leitura conjunta       | uma operação               | pode exigir operação adicional ou `$lookup` |
+| Atomicidade            | single-document            | transação para invariantes multi-documento  |
+| Duplicação             | possível                   | menor                                       |
+| Crescimento            | limitado pelo documento    | entidades crescem separadamente             |
+| Relação                | “contains”, um-para-poucos | muitos-para-muitos, alta cardinalidade      |
+| Atualização partilhada | várias cópias              | uma fonte                                   |
 
 Usar embedding quando os dados são lidos/alterados juntos, têm cardinalidade limitada e pertencem ao ciclo de vida do pai. Usar references quando a entidade é partilhada, cresce sem limite prático, muda independentemente ou seria duplicada de forma dispendiosa.
 
@@ -39,19 +39,19 @@ Documentos de uma collection podem ter formas diferentes, útil para evolução 
 
 ### Tipos BSON de maior relevância
 
-| Tipo | Uso |
-|---|---|
-| String | texto UTF-8 |
-| Object | subdocumento |
-| Array | sequência ordenada |
-| ObjectId | identificador BSON de 12 bytes |
-| Boolean | verdadeiro/falso |
-| Date | instante UTC em milissegundos desde epoch |
-| Int32 / Long / Double / Decimal128 | semânticas numéricas distintas |
-| Null | valor nulo explícito |
-| Binary | bytes e subtipos |
-| Regular Expression | padrão |
-| Timestamp | tipo interno BSON, distinto de Date |
+| Tipo                               | Uso                                       |
+| ---------------------------------- | ----------------------------------------- |
+| String                             | texto UTF-8                               |
+| Object                             | subdocumento                              |
+| Array                              | sequência ordenada                        |
+| ObjectId                           | identificador BSON de 12 bytes            |
+| Boolean                            | verdadeiro/falso                          |
+| Date                               | instante UTC em milissegundos desde epoch |
+| Int32 / Long / Double / Decimal128 | semânticas numéricas distintas            |
+| Null                               | valor nulo explícito                      |
+| Binary                             | bytes e subtipos                          |
+| Regular Expression                 | padrão                                    |
+| Timestamp                          | tipo interno BSON, distinto de Date       |
 
 Para dinheiro, `Decimal128` evita erros binários de `double`, mas a aplicação deve converter explicitamente e manter regras de escala/arredondamento.
 
@@ -80,12 +80,12 @@ O limite de 16 MiB aplica-se a cada documento BSON. Para ficheiros maiores, Grid
 
 Um update single-document adquire a coordenação necessária e aplica a alteração atomicamente. Se duas operações condicionais competirem, incluir o estado esperado no filtro transforma a operação num compare-and-set:
 
-~~~javascript
+```javascript
 const result = await orders.updateOne(
-  { _id: orderId, status: "pending" },
-  { $set: { status: "paid", paidAt: new Date() } }
+    { _id: orderId, status: "pending" },
+    { $set: { status: "paid", paidAt: new Date() } },
 );
-~~~
+```
 
 Só uma operação que ainda encontre `status: "pending"` modifica o documento. `matchedCount === 0` indica conflito ou ausência.
 
@@ -99,81 +99,81 @@ Quando um índice inclui um array, MongoDB cria entradas de índice para os elem
 
 ### Documento com embedding
 
-~~~javascript
+```javascript
 const order = {
-  customerId: new ObjectId("64f000000000000000000001"),
-  status: "pending",
-  shippingAddress: {
-    street: "Rua do Ouro, 10",
-    city: "Lisboa",
-    postalCode: "1100-060",
-    country: "PT"
-  },
-  items: [
-    {
-      productId: new ObjectId("64f000000000000000000101"),
-      nameSnapshot: "Teclado mecânico",
-      quantity: 1,
-      unitPrice: Decimal128.fromString("89.90")
-    }
-  ],
-  createdAt: new Date()
+    customerId: new ObjectId("64f000000000000000000001"),
+    status: "pending",
+    shippingAddress: {
+        street: "Rua do Ouro, 10",
+        city: "Lisboa",
+        postalCode: "1100-060",
+        country: "PT",
+    },
+    items: [
+        {
+            productId: new ObjectId("64f000000000000000000101"),
+            nameSnapshot: "Teclado mecânico",
+            quantity: 1,
+            unitPrice: Decimal128.fromString("89.90"),
+        },
+    ],
+    createdAt: new Date(),
 };
-~~~
+```
 
 O snapshot de nome e preço é duplicação intencional: uma encomenda histórica não deve mudar quando o catálogo muda.
 
 ### Dot notation
 
-~~~javascript
+```javascript
 const exampleFilters = [
-  { "shippingAddress.country": "PT" },
-  { "items.productId": productId },
-  {
-    items: {
-      $elemMatch: {
-        quantity: { $gte: 2 },
-        unitPrice: { $lt: price }
-      }
-    }
-  }
+    { "shippingAddress.country": "PT" },
+    { "items.productId": productId },
+    {
+        items: {
+            $elemMatch: {
+                quantity: { $gte: 2 },
+                unitPrice: { $lt: price },
+            },
+        },
+    },
 ];
-~~~
+```
 
 `$elemMatch` garante que as condições se aplicam ao mesmo elemento do array. Sem ele, condições em paths paralelos podem ser satisfeitas por elementos diferentes.
 
 ### Validator
 
-~~~javascript
+```javascript
 await db.createCollection("orders", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["customerId", "status", "items", "createdAt"],
-      properties: {
-        customerId: { bsonType: "objectId" },
-        status: { enum: ["pending", "paid", "cancelled"] },
-        items: {
-          bsonType: "array",
-          minItems: 1,
-          items: {
+    validator: {
+        $jsonSchema: {
             bsonType: "object",
-            required: ["productId", "quantity", "unitPrice"],
+            required: ["customerId", "status", "items", "createdAt"],
             properties: {
-              productId: { bsonType: "objectId" },
-              quantity: { bsonType: "int", minimum: 1 },
-              unitPrice: { bsonType: "decimal", minimum: 0 }
-            }
-          }
+                customerId: { bsonType: "objectId" },
+                status: { enum: ["pending", "paid", "cancelled"] },
+                items: {
+                    bsonType: "array",
+                    minItems: 1,
+                    items: {
+                        bsonType: "object",
+                        required: ["productId", "quantity", "unitPrice"],
+                        properties: {
+                            productId: { bsonType: "objectId" },
+                            quantity: { bsonType: "int", minimum: 1 },
+                            unitPrice: { bsonType: "decimal", minimum: 0 },
+                        },
+                    },
+                },
+                createdAt: { bsonType: "date" },
+            },
         },
-        createdAt: { bsonType: "date" }
-      }
-    }
-  },
-  validationLevel: "strict",
-  validationAction: "error"
+    },
+    validationLevel: "strict",
+    validationAction: "error",
 });
-~~~
+```
 
 `validationLevel` determina que documentos são validados; `validationAction: "error"` rejeita, enquanto `"warn"` regista sem rejeitar.
 
@@ -183,90 +183,90 @@ await db.createCollection("orders", {
 
 ### Exemplo 1 — inserir tipos BSON deliberados
 
-~~~javascript
+```javascript
 import { Decimal128, MongoClient, ObjectId } from "mongodb";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const products = client.db("certification_lab").collection("products");
-  const product = {
-    _id: new ObjectId(),
-    sku: "KB-PT-001",
-    name: "Teclado mecânico",
-    price: Decimal128.fromString("89.90"),
-    tags: ["keyboards", "mechanical"],
-    dimensions: { widthMm: 440, depthMm: 135 },
-    active: true,
-    createdAt: new Date()
-  };
+    const products = client.db("certification_lab").collection("products");
+    const product = {
+        _id: new ObjectId(),
+        sku: "KB-PT-001",
+        name: "Teclado mecânico",
+        price: Decimal128.fromString("89.90"),
+        tags: ["keyboards", "mechanical"],
+        dimensions: { widthMm: 440, depthMm: 135 },
+        active: true,
+        createdAt: new Date(),
+    };
 
-  const result = await products.insertOne(product);
-  console.log(result.insertedId);
+    const result = await products.insertOne(product);
+    console.log(result.insertedId);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: documento com `ObjectId`, `Decimal128` e Date BSON, não strings equivalentes.
 
 ### Exemplo 2 — query correta sobre array de subdocumentos
 
-~~~javascript
+```javascript
 import { Decimal128, MongoClient } from "mongodb";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const sales = client.db("sample_supplies").collection("sales");
-  const filter = {
-    items: {
-      $elemMatch: {
-        quantity: { $gte: 5 },
-        price: { $gte: Decimal128.fromString("100.00") }
-      }
-    }
-  };
+    const sales = client.db("sample_supplies").collection("sales");
+    const filter = {
+        items: {
+            $elemMatch: {
+                quantity: { $gte: 5 },
+                price: { $gte: Decimal128.fromString("100.00") },
+            },
+        },
+    };
 
-  const sale = await sales.findOne(filter, {
-    projection: { _id: 0, saleDate: 1, items: 1 }
-  });
+    const sale = await sales.findOne(filter, {
+        projection: { _id: 0, saleDate: 1, items: 1 },
+    });
 
-  console.dir(sale, { depth: null });
+    console.dir(sale, { depth: null });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: uma venda em que pelo menos um mesmo item satisfaz quantidade e preço, ou `null`.
 
 ### Exemplo 3 — update condicional atómico
 
-~~~javascript
+```javascript
 import { MongoClient, ObjectId } from "mongodb";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 const orderId = new ObjectId(process.env.ORDER_ID);
 
 try {
-  const orders = client.db("shop").collection("orders");
-  const result = await orders.updateOne(
-    { _id: orderId, status: "pending" },
-    {
-      $set: {
-        status: "paid",
-        paidAt: new Date()
-      }
-    }
-  );
+    const orders = client.db("shop").collection("orders");
+    const result = await orders.updateOne(
+        { _id: orderId, status: "pending" },
+        {
+            $set: {
+                status: "paid",
+                paidAt: new Date(),
+            },
+        },
+    );
 
-  if (result.modifiedCount !== 1) {
-    throw new Error("A encomenda não existe ou já não está pendente.");
-  }
+    if (result.modifiedCount !== 1) {
+        throw new Error("A encomenda não existe ou já não está pendente.");
+    }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: exatamente uma transição válida ou um erro de domínio lançado pela aplicação.
 
@@ -379,19 +379,19 @@ Fontes oficiais: [data modeling](https://www.mongodb.com/docs/manual/data-modeli
 >
 > A decisão de modelação troca coesão por independência.
 
-| Critério | Embedding | Referencing |
-|---|---|---|
-| leitura conjunta | uma leitura natural | pode exigir nova query/`$lookup` |
-| atomicidade | single-document | pode exigir transação |
-| crescimento | deve ser controlado | suporta conjuntos independentes |
-| partilha | duplica dados se muitos owners | entidade comum reutilizável |
-| lifecycle | normalmente conjunto | pode evoluir separadamente |
+| Critério         | Embedding                      | Referencing                      |
+| ---------------- | ------------------------------ | -------------------------------- |
+| leitura conjunta | uma leitura natural            | pode exigir nova query/`$lookup` |
+| atomicidade      | single-document                | pode exigir transação            |
+| crescimento      | deve ser controlado            | suporta conjuntos independentes  |
+| partilha         | duplica dados se muitos owners | entidade comum reutilizável      |
+| lifecycle        | normalmente conjunto           | pode evoluir separadamente       |
 
 > **Ligação entre capítulos:** `$elemMatch` é usado no capítulo 05; updates de arrays no 06; multikey indexes no 09; transações no 12.
 
 ### Fluxograma: embedding ou referencing?
 
-~~~text
+```text
 Os dados são lidos e alterados juntos?
   |-- não --> Referencing tende a ser mais natural
   `-- sim --> O conjunto cresce sem limite ou é muito partilhado?
@@ -399,7 +399,7 @@ Os dados são lidos e alterados juntos?
                 `-- não --> A atomicidade conjunta é valiosa?
                               |-- sim --> Embedding
                               `-- não --> comparar custo e lifecycle
-~~~
+```
 
 ### Mini desafio
 

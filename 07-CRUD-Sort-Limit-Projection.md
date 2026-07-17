@@ -16,9 +16,9 @@
 
 `{ field: 1 }` ordena ascendentemente e `{ field: -1 }` descendentemente. Num compound sort, a ordem das chaves define a precedência:
 
-~~~javascript
+```javascript
 const sort = { year: -1, title: 1 };
-~~~
+```
 
 Ano é o critério principal; título resolve empates. Sem um tiebreaker único, paginação pode ser instável quando muitos documentos têm os mesmos valores.
 
@@ -48,10 +48,10 @@ Operadores de projection relevantes:
 
 ### Count
 
-| Método | Filtro | Exatidão/uso |
-|---|---|---|
-| `countDocuments(filter)` | sim | conta matches segundo query |
-| `estimatedDocumentCount()` | não | usa metadata para estimar total da collection |
+| Método                     | Filtro | Exatidão/uso                                  |
+| -------------------------- | ------ | --------------------------------------------- |
+| `countDocuments(filter)`   | sim    | conta matches segundo query                   |
+| `estimatedDocumentCount()` | não    | usa metadata para estimar total da collection |
 
 `cursor.count()` e `collection.count()` pertencem a APIs antigas/deprecated; usar os métodos explícitos.
 
@@ -67,9 +67,9 @@ Um índice B-tree já mantém chaves ordenadas. Se filtro e sort respeitam os pr
 
 Exemplo:
 
-~~~javascript
+```javascript
 const index = { status: 1, createdAt: -1, _id: -1 };
-~~~
+```
 
 Suporta filtro de igualdade em `status` e sort `{ createdAt: -1, _id: -1 }`. Também pode percorrer todo o padrão no sentido inverso. Misturar direções exige compatibilidade com o compound index.
 
@@ -83,21 +83,24 @@ Uma query é coberta quando filtro e campos devolvidos estão no índice e não 
 
 Offset pagination:
 
-~~~javascript
-find(filter).sort(sort).skip(page * size).limit(size)
-~~~
+```javascript
+find(filter)
+    .sort(sort)
+    .skip(page * size)
+    .limit(size);
+```
 
 Keyset pagination:
 
-~~~javascript
+```javascript
 const pageFilter = {
-  ...baseFilter,
-  $or: [
-    { createdAt: { $lt: lastCreatedAt } },
-    { createdAt: lastCreatedAt, _id: { $lt: lastId } }
-  ]
+    ...baseFilter,
+    $or: [
+        { createdAt: { $lt: lastCreatedAt } },
+        { createdAt: lastCreatedAt, _id: { $lt: lastId } },
+    ],
 };
-~~~
+```
 
 A segunda mantém uma fronteira lexicográfica para sort descendente `{ createdAt: -1, _id: -1 }`.
 
@@ -107,54 +110,54 @@ A segunda mantém uma fronteira lexicográfica para sort descendente `{ createdA
 
 ### Formas em options
 
-~~~javascript
+```javascript
 const cursor = collection.find(filter, {
-  projection: { _id: 0, title: 1, year: 1 },
-  sort: { year: -1, title: 1 },
-  limit: 25,
-  skip: 0
+    projection: { _id: 0, title: 1, year: 1 },
+    sort: { year: -1, title: 1 },
+    limit: 25,
+    skip: 0,
 });
-~~~
+```
 
 ### Forma encadeada
 
-~~~javascript
+```javascript
 const cursor = collection
-  .find(filter)
-  .project({ _id: 0, title: 1, year: 1 })
-  .sort({ year: -1, title: 1 })
-  .skip(0)
-  .limit(25);
-~~~
+    .find(filter)
+    .project({ _id: 0, title: 1, year: 1 })
+    .sort({ year: -1, title: 1 })
+    .skip(0)
+    .limit(25);
+```
 
 Configurar o cursor antes da iteração. Não executar operações assíncronas concorrentes sobre o mesmo cursor nem misturar paradigmas como `toArray()` e `for await`.
 
 ### Projection de arrays
 
-~~~javascript
+```javascript
 const exampleProjections = [
-  { cast: { $slice: 3 } },
-  {
-    grades: {
-      $elemMatch: {
-        grade: "A",
-        score: { $lte: 5 }
-      }
-    }
-  }
+    { cast: { $slice: 3 } },
+    {
+        grades: {
+            $elemMatch: {
+                grade: "A",
+                score: { $lte: 5 },
+            },
+        },
+    },
 ];
-~~~
+```
 
 ### Counts
 
-~~~javascript
+```javascript
 const exact = await collection.countDocuments(
-  { status: "active" },
-  { maxTimeMS: 2_000 }
+    { status: "active" },
+    { maxTimeMS: 2_000 },
 );
 
 const estimate = await collection.estimatedDocumentCount();
-~~~
+```
 
 ---
 
@@ -162,7 +165,7 @@ const estimate = await collection.estimatedDocumentCount();
 
 ### Exemplo 1 — top N com ordem determinística
 
-~~~javascript
+```javascript
 /**
  * @file Obtém os filmes melhor classificados com desempate estável.
  */
@@ -171,38 +174,38 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const topMovies = await movies
-    .find({
-      year: { $gte: 2000 },
-      "imdb.votes": { $gte: 10_000 }
-    })
-    .project({
-      _id: 0,
-      title: 1,
-      year: 1,
-      "imdb.rating": 1,
-      "imdb.votes": 1
-    })
-    .sort({
-      "imdb.rating": -1,
-      "imdb.votes": -1,
-      title: 1
-    })
-    .limit(20)
-    .toArray();
+    const movies = client.db("sample_mflix").collection("movies");
+    const topMovies = await movies
+        .find({
+            year: { $gte: 2000 },
+            "imdb.votes": { $gte: 10_000 },
+        })
+        .project({
+            _id: 0,
+            title: 1,
+            year: 1,
+            "imdb.rating": 1,
+            "imdb.votes": 1,
+        })
+        .sort({
+            "imdb.rating": -1,
+            "imdb.votes": -1,
+            title: 1,
+        })
+        .limit(20)
+        .toArray();
 
-  console.table(topMovies);
+    console.table(topMovies);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: 20 ou menos documentos, com desempates explícitos.
 
 ### Exemplo 2 — keyset pagination
 
-~~~javascript
+```javascript
 /**
  * @file Lê a página seguinte sem skip profundo.
  */
@@ -211,41 +214,40 @@ import { MongoClient, ObjectId } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 const pageSize = 25;
 const lastCreatedAt = process.env.LAST_CREATED_AT
-  ? new Date(process.env.LAST_CREATED_AT)
-  : null;
-const lastId = process.env.LAST_ID
-  ? new ObjectId(process.env.LAST_ID)
-  : null;
+    ? new Date(process.env.LAST_CREATED_AT)
+    : null;
+const lastId = process.env.LAST_ID ? new ObjectId(process.env.LAST_ID) : null;
 
 try {
-  const posts = client.db("blog").collection("posts");
-  const boundary = lastCreatedAt && lastId
-    ? {
-        $or: [
-          { createdAt: { $lt: lastCreatedAt } },
-          { createdAt: lastCreatedAt, _id: { $lt: lastId } }
-        ]
-      }
-    : {};
+    const posts = client.db("blog").collection("posts");
+    const boundary =
+        lastCreatedAt && lastId
+            ? {
+                  $or: [
+                      { createdAt: { $lt: lastCreatedAt } },
+                      { createdAt: lastCreatedAt, _id: { $lt: lastId } },
+                  ],
+              }
+            : {};
 
-  const page = await posts
-    .find({ status: "published", ...boundary })
-    .project({ title: 1, slug: 1, createdAt: 1 })
-    .sort({ createdAt: -1, _id: -1 })
-    .limit(pageSize)
-    .toArray();
+    const page = await posts
+        .find({ status: "published", ...boundary })
+        .project({ title: 1, slug: 1, createdAt: 1 })
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(pageSize)
+        .toArray();
 
-  console.log(page);
+    console.log(page);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: primeira página sem cursor externo ou página seguinte após o par data/id.
 
 ### Exemplo 3 — projection de array
 
-~~~javascript
+```javascript
 /**
  * @file Devolve apenas os três primeiros atores de cada filme.
  */
@@ -254,34 +256,34 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const documents = await movies
-    .find(
-      { genres: "Comedy" },
-      {
-        projection: {
-          _id: 0,
-          title: 1,
-          year: 1,
-          cast: { $slice: 3 }
-        }
-      }
-    )
-    .sort({ year: -1, title: 1 })
-    .limit(10)
-    .toArray();
+    const movies = client.db("sample_mflix").collection("movies");
+    const documents = await movies
+        .find(
+            { genres: "Comedy" },
+            {
+                projection: {
+                    _id: 0,
+                    title: 1,
+                    year: 1,
+                    cast: { $slice: 3 },
+                },
+            },
+        )
+        .sort({ year: -1, title: 1 })
+        .limit(10)
+        .toArray();
 
-  console.dir(documents, { depth: null });
+    console.dir(documents, { depth: null });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: até dez comédias e, em cada uma, no máximo três elementos de `cast`.
 
 ### Exemplo 4 — count exato versus estimativa
 
-~~~javascript
+```javascript
 /**
  * @file Compara uma contagem filtrada com uma estimativa global.
  */
@@ -290,17 +292,17 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const [dramaCount, collectionEstimate] = await Promise.all([
-    movies.countDocuments({ genres: "Drama" }, { maxTimeMS: 5_000 }),
-    movies.estimatedDocumentCount()
-  ]);
+    const movies = client.db("sample_mflix").collection("movies");
+    const [dramaCount, collectionEstimate] = await Promise.all([
+        movies.countDocuments({ genres: "Drama" }, { maxTimeMS: 5_000 }),
+        movies.estimatedDocumentCount(),
+    ]);
 
-  console.log({ dramaCount, collectionEstimate });
+    console.log({ dramaCount, collectionEstimate });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: contagem de dramas e estimativa do total, com semânticas diferentes.
 
@@ -417,20 +419,20 @@ Fontes oficiais: [sort no driver](https://www.mongodb.com/docs/drivers/node/curr
 >
 > Operações parecidas controlam dimensões diferentes do resultado.
 
-| Conceito | Controla | Não controla |
-|---|---|---|
-| projection | fields devolvidos | número de documentos |
-| `limit()` | total máximo | tamanho de cada batch |
-| `batchSize()` | transferência por batch | total final |
-| `skip()` | offset descartado | estabilidade sem sort |
-| `countDocuments(filter)` | contagem exata do filtro | estimativa barata global |
-| `estimatedDocumentCount()` | estimativa da collection | filtro arbitrário |
+| Conceito                   | Controla                 | Não controla             |
+| -------------------------- | ------------------------ | ------------------------ |
+| projection                 | fields devolvidos        | número de documentos     |
+| `limit()`                  | total máximo             | tamanho de cada batch    |
+| `batchSize()`              | transferência por batch  | total final              |
+| `skip()`                   | offset descartado        | estabilidade sem sort    |
+| `countDocuments(filter)`   | contagem exata do filtro | estimativa barata global |
+| `estimatedDocumentCount()` | estimativa da collection | filtro arbitrário        |
 
 > **Ligação entre capítulos:** o cursor nasce no capítulo 05; lifecycle no 08; suporte de sort e covered queries no capítulo 09.
 
 ### Fluxo de paginação
 
-~~~text
+```text
 Dataset pequeno e página ocasional?
   |-- sim --> sort determinístico + skip + limit pode bastar
   `-- não --> páginas profundas ou feed contínuo?
@@ -439,7 +441,7 @@ Dataset pequeno e página ocasional?
 
 Sort: { createdAt: -1, _id: -1 }
 Cursor seguinte: valores de createdAt + _id da última linha
-~~~
+```
 
 ### Mini desafio
 

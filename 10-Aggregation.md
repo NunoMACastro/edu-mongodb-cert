@@ -14,41 +14,41 @@
 
 Uma aggregation pipeline é um array ordenado de stages. Cada stage recebe um stream/conjunto de documentos e emite documentos para o seguinte. A ordem altera semântica e custo.
 
-~~~javascript
+```javascript
 [
-  { $match: { status: "paid" } },
-  { $group: { _id: "$country", revenue: { $sum: "$total" } } },
-  { $sort: { revenue: -1 } }
-]
-~~~
+    { $match: { status: "paid" } },
+    { $group: { _id: "$country", revenue: { $sum: "$total" } } },
+    { $sort: { revenue: -1 } },
+];
+```
 
 ### Stage versus expression versus accumulator
 
-| Categoria | Exemplo | Papel |
-|---|---|---|
-| stage | `$match`, `$group` | transforma o stream |
-| expression | `$add`, `$multiply` | calcula um valor dentro de stage |
-| accumulator | `$sum`, `$avg` | agrega valores no `$group`/contextos suportados |
+| Categoria   | Exemplo             | Papel                                           |
+| ----------- | ------------------- | ----------------------------------------------- |
+| stage       | `$match`, `$group`  | transforma o stream                             |
+| expression  | `$add`, `$multiply` | calcula um valor dentro de stage                |
+| accumulator | `$sum`, `$avg`      | agrega valores no `$group`/contextos suportados |
 
 `$match` usa query predicate syntax. `$project`/`$set` usam aggregation expressions. Confundir contextos é uma fonte frequente de respostas erradas.
 
 ### Stages essenciais
 
-| Stage | Função |
-|---|---|
-| `$match` | filtra |
-| `$project` | inclui, exclui e calcula campos |
-| `$set` / `$addFields` | adiciona/substitui campos |
-| `$unset` | remove campos |
-| `$unwind` | emite um documento por elemento do array |
-| `$group` | agrupa por key e acumula |
-| `$sort` | ordena |
-| `$skip` / `$limit` | pagina/restringe |
-| `$count` | emite contagem |
-| `$lookup` | junta dados de outra collection |
-| `$bucket` / `$bucketAuto` | cria intervalos |
-| `$facet` | executa subpipelines sobre o mesmo input |
-| `$out` / `$merge` | persiste resultados |
+| Stage                     | Função                                   |
+| ------------------------- | ---------------------------------------- |
+| `$match`                  | filtra                                   |
+| `$project`                | inclui, exclui e calcula campos          |
+| `$set` / `$addFields`     | adiciona/substitui campos                |
+| `$unset`                  | remove campos                            |
+| `$unwind`                 | emite um documento por elemento do array |
+| `$group`                  | agrupa por key e acumula                 |
+| `$sort`                   | ordena                                   |
+| `$skip` / `$limit`        | pagina/restringe                         |
+| `$count`                  | emite contagem                           |
+| `$lookup`                 | junta dados de outra collection          |
+| `$bucket` / `$bucketAuto` | cria intervalos                          |
+| `$facet`                  | executa subpipelines sobre o mesmo input |
+| `$out` / `$merge`         | persiste resultados                      |
 
 `aggregate()`, por defeito, não modifica a collection. `$out` e `$merge` são exceções explícitas.
 
@@ -105,76 +105,73 @@ O slot-based execution engine pode executar stages elegíveis com menor CPU/mem�
 
 ### Pipeline
 
-~~~javascript
-const pipeline = [
-  { $match: { status: "paid" } },
-  { $limit: 10 }
-];
+```javascript
+const pipeline = [{ $match: { status: "paid" } }, { $limit: 10 }];
 
 const options = {
-  allowDiskUse: true,
-  maxTimeMS: 10_000,
-  comment: "monthly-report"
+    allowDiskUse: true,
+    maxTimeMS: 10_000,
+    comment: "monthly-report",
 };
 
 db.collection.aggregate(pipeline, options);
-~~~
+```
 
 ### Group
 
-~~~javascript
+```javascript
 const groupStage = {
-  $group: {
-    _id: "$groupKey",
-    count: { $sum: 1 },
-    total: { $sum: "$amount" },
-    average: { $avg: "$amount" },
-    first: { $first: "$value" },
-    values: { $addToSet: "$value" }
-  }
+    $group: {
+        _id: "$groupKey",
+        count: { $sum: 1 },
+        total: { $sum: "$amount" },
+        average: { $avg: "$amount" },
+        first: { $first: "$value" },
+        values: { $addToSet: "$value" },
+    },
 };
-~~~
+```
 
 `$first` e `$last` dependem da ordem do stream; usar `$sort` quando a ordem é parte da regra.
 
 ### Lookup simples
 
-~~~javascript
+```javascript
 const lookupStage = {
-  $lookup: {
-    from: "products",
-    localField: "productId",
-    foreignField: "_id",
-    as: "product"
-  }
+    $lookup: {
+        from: "products",
+        localField: "productId",
+        foreignField: "_id",
+        as: "product",
+    },
 };
-~~~
+```
 
 O output é sempre um array `product`. Para relação um-para-um lógica, pode seguir `$unwind`, decidindo `preserveNullAndEmptyArrays`.
 
 ### Lookup correlacionado
 
-~~~javascript
+```javascript
 const correlatedLookupStage = {
-  $lookup: {
-    from: "warehouses",
-    let: { orderedQuantity: "$ordered", itemSku: "$item" },
-    pipeline: [
-      {
-        $match: {
-          $expr: {
-            $and: [
-              { $eq: ["$stockItem", "$$itemSku"] },
-              { $gte: ["$inStock", "$$orderedQuantity"] }
-            ]
-          }
-        }
-      }
-    ],
-    as: "eligibleWarehouses"
-  }
+    $lookup: {
+        from: "warehouses",
+        let: { orderedQuantity: "$ordered", itemSku: "$item" },
+        pipeline: [
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ["$stockItem", "$$itemSku"] },
+                            { $gte: ["$inStock", "$$orderedQuantity"] },
+                        ],
+                    },
+                },
+            },
+        ],
+        as: "eligibleWarehouses",
+    },
 };
-~~~
+```
 
 `$expr` permite usar expressions no match e `$$variable` referencia variáveis de `let`.
 
@@ -184,7 +181,7 @@ const correlatedLookupStage = {
 
 ### Exemplo 1 — receita mensal por loja
 
-~~~mongosh
+```mongosh
 use sample_supplies
 
 const pipeline = [
@@ -218,13 +215,13 @@ const pipeline = [
 ];
 
 db.sales.aggregate(pipeline);
-~~~
+```
 
 Resultado: um documento por loja/mês com receita e unidades.
 
 ### Exemplo 2 — distribuição de ratings
 
-~~~mongosh
+```mongosh
 use sample_mflix
 
 db.movies.aggregate([
@@ -251,13 +248,13 @@ db.movies.aggregate([
     }
   }
 ]);
-~~~
+```
 
 Resultado: buckets pelos limites inferiores e até três exemplos por bucket.
 
 ### Exemplo 3 — uma passagem, várias métricas
 
-~~~mongosh
+```mongosh
 use sample_mflix
 
 db.movies.aggregate([
@@ -290,13 +287,13 @@ db.movies.aggregate([
     }
   }
 ]);
-~~~
+```
 
 Resultado: um documento com três arrays, todos calculados sobre o mesmo input filtrado.
 
 ### Exemplo 4 — preservar ou eliminar arrays vazios
 
-~~~mongosh
+```mongosh
 use sample_mflix
 
 db.movies.aggregate([
@@ -317,7 +314,7 @@ db.movies.aggregate([
     }
   }
 ]);
-~~~
+```
 
 Resultado: um documento por género; filmes sem array podem ser preservados.
 
@@ -437,19 +434,19 @@ Fontes oficiais: [aggregation](https://www.mongodb.com/docs/manual/aggregation/)
 >
 > Escolher `find()` ou `aggregate()` depende da transformação necessária.
 
-| Necessidade | `find()` | `aggregate()` |
-|---|---|---|
+| Necessidade               | `find()`       | `aggregate()`                      |
+| ------------------------- | -------------- | ---------------------------------- |
 | filtro/projection simples | direto e claro | possível, geralmente desnecessário |
-| sort/limit simples | API de cursor | possível |
-| grouping/accumulators | não | sim |
-| join/facet/window | não | sim |
-| retorno | `FindCursor` | `AggregationCursor` no driver |
+| sort/limit simples        | API de cursor  | possível                           |
+| grouping/accumulators     | não            | sim                                |
+| join/facet/window         | não            | sim                                |
+| retorno                   | `FindCursor`   | `AggregationCursor` no driver      |
 
 > **Ligação entre capítulos:** índices do capítulo 09 ajudam os stages iniciais; execução no driver está no capítulo 11; Search adiciona stages especializados no 13.
 
 ### Mapa mental da pipeline
 
-~~~text
+```text
 collection
    |
  $match        reduz documentos
@@ -463,7 +460,7 @@ collection
  $sort
    |
  $limit
-~~~
+```
 
 ### Mini desafio
 

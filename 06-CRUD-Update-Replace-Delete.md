@@ -14,28 +14,28 @@
 
 ### update versus replace
 
-| Operação | Segundo argumento | Preserva campos omitidos? | Pode alterar `_id`? |
-|---|---|---:|---:|
-| `updateOne`/`updateMany` | operadores ou pipeline | sim, salvo remoção explícita | não |
-| `replaceOne` | replacement document | não | não |
+| Operação                 | Segundo argumento      |    Preserva campos omitidos? | Pode alterar `_id`? |
+| ------------------------ | ---------------------- | ---------------------------: | ------------------: |
+| `updateOne`/`updateMany` | operadores ou pipeline | sim, salvo remoção explícita |                 não |
+| `replaceOne`             | replacement document   |                          não |                 não |
 
 `$set` altera paths selecionados. `replaceOne` substitui todo o documento correspondente, preservando `_id` se omitido no replacement. Não usar replacement para “editar dois campos” a menos que a substituição total seja intencional.
 
 ### Operadores de update
 
-| Operador | Efeito |
-|---|---|
-| `$set` | atribui/cria campo |
-| `$unset` | remove campo |
-| `$inc` | incrementa valor numérico |
-| `$mul` | multiplica |
-| `$min` / `$max` | altera apenas se menor/maior |
-| `$rename` | muda nome do campo |
-| `$currentDate` | define data/timestamp atual |
-| `$push` | acrescenta ao array, aceita modifiers |
-| `$addToSet` | acrescenta se valor exato não existe |
-| `$pull` | remove elementos correspondentes |
-| `$pop` | remove primeiro/último |
+| Operador        | Efeito                                |
+| --------------- | ------------------------------------- |
+| `$set`          | atribui/cria campo                    |
+| `$unset`        | remove campo                          |
+| `$inc`          | incrementa valor numérico             |
+| `$mul`          | multiplica                            |
+| `$min` / `$max` | altera apenas se menor/maior          |
+| `$rename`       | muda nome do campo                    |
+| `$currentDate`  | define data/timestamp atual           |
+| `$push`         | acrescenta ao array, aceita modifiers |
+| `$addToSet`     | acrescenta se valor exato não existe  |
+| `$pull`         | remove elementos correspondentes      |
+| `$pop`          | remove primeiro/último                |
 
 `$addToSet` evita duplicados por igualdade BSON, mas não transforma retroativamente um array com duplicados num set. Em subdocumentos, ordem de campos pode afetar igualdade.
 
@@ -63,12 +63,9 @@ O servidor usa o filtro para localizar matches. Cada documento é modificado ato
 
 `matchedCount` conta documentos que corresponderam, mesmo que o novo valor seja igual. `modifiedCount` conta modificações efetivas e pode ser 0 quando já estava no estado desejado. Isto torna updates idempotentes possíveis:
 
-~~~javascript
-await users.updateOne(
-  { _id: userId },
-  { $set: { locale: "pt-PT" } }
-);
-~~~
+```javascript
+await users.updateOne({ _id: userId }, { $set: { locale: "pt-PT" } });
+```
 
 Executar duas vezes deixa o mesmo estado.
 
@@ -90,53 +87,48 @@ O delete encontra documentos pelo plano de query e remove entradas de todos os �
 
 ### Updates
 
-~~~javascript
+```javascript
 const result = await collection.updateOne(
-  filter,
-  { $set: changes, $currentDate: { updatedAt: true } },
-  { upsert: false, arrayFilters, hint, writeConcern }
+    filter,
+    { $set: changes, $currentDate: { updatedAt: true } },
+    { upsert: false, arrayFilters, hint, writeConcern },
 );
 
 const manyResult = await collection.updateMany(filter, update, options);
-~~~
+```
 
 `UpdateResult` contém `acknowledged`, `matchedCount`, `modifiedCount`, `upsertedCount` e `upsertedId`.
 
 ### Replace
 
-~~~javascript
-const result = await collection.replaceOne(
-  { _id: documentId },
-  replacement,
-  { upsert: false }
-);
-~~~
+```javascript
+const result = await collection.replaceOne({ _id: documentId }, replacement, {
+    upsert: false,
+});
+```
 
 O replacement não pode conter update operators de topo.
 
 ### Delete
 
-~~~javascript
+```javascript
 const one = await collection.deleteOne(filter, { hint });
 const many = await collection.deleteMany(filter, { hint });
-~~~
+```
 
 `DeleteResult.deletedCount` indica quantos documentos foram eliminados.
 
 ### Update pipeline
 
-~~~javascript
-await collection.updateMany(
-  { subtotal: { $exists: true } },
-  [
+```javascript
+await collection.updateMany({ subtotal: { $exists: true } }, [
     {
-      $set: {
-        total: { $round: [{ $multiply: ["$subtotal", 1.23] }, 2] }
-      }
-    }
-  ]
-);
-~~~
+        $set: {
+            total: { $round: [{ $multiply: ["$subtotal", 1.23] }, 2] },
+        },
+    },
+]);
+```
 
 Num update pipeline, `$set` é aggregation stage, não o update operator clássico, embora o nome coincida.
 
@@ -146,7 +138,7 @@ Num update pipeline, `$set` é aggregation stage, não o update operator clássi
 
 ### Exemplo 1 — update parcial e contadores
 
-~~~javascript
+```javascript
 /**
  * @file Atualiza metadados sem substituir o filme inteiro.
  */
@@ -156,29 +148,29 @@ const client = new MongoClient(process.env.MONGODB_URI);
 const movieId = new ObjectId(process.env.MOVIE_ID);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const result = await movies.updateOne(
-    { _id: movieId },
-    {
-      $set: { "viewerSettings.featured": true },
-      $currentDate: { "viewerSettings.updatedAt": true }
-    }
-  );
+    const movies = client.db("sample_mflix").collection("movies");
+    const result = await movies.updateOne(
+        { _id: movieId },
+        {
+            $set: { "viewerSettings.featured": true },
+            $currentDate: { "viewerSettings.updatedAt": true },
+        },
+    );
 
-  console.log({
-    matched: result.matchedCount,
-    modified: result.modifiedCount
-  });
+    console.log({
+        matched: result.matchedCount,
+        modified: result.modifiedCount,
+    });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: match 1 se o filme existe; modified pode ser 0 ou 1 conforme o estado.
 
 ### Exemplo 2 — upsert com `$setOnInsert`
 
-~~~javascript
+```javascript
 /**
  * @file Regista a preferência atual ou cria-a de forma concorrente.
  */
@@ -188,38 +180,38 @@ const client = new MongoClient(process.env.MONGODB_URI);
 const userId = new ObjectId(process.env.USER_ID);
 
 try {
-  const preferences = client.db("app").collection("preferences");
-  await preferences.createIndex({ userId: 1 }, { unique: true });
+    const preferences = client.db("app").collection("preferences");
+    await preferences.createIndex({ userId: 1 }, { unique: true });
 
-  const result = await preferences.updateOne(
-    { userId },
-    {
-      $set: {
-        locale: "pt-PT",
-        theme: "dark",
-        updatedAt: new Date()
-      },
-      $setOnInsert: {
-        createdAt: new Date()
-      }
-    },
-    { upsert: true }
-  );
+    const result = await preferences.updateOne(
+        { userId },
+        {
+            $set: {
+                locale: "pt-PT",
+                theme: "dark",
+                updatedAt: new Date(),
+            },
+            $setOnInsert: {
+                createdAt: new Date(),
+            },
+        },
+        { upsert: true },
+    );
 
-  console.log({
-    matched: result.matchedCount,
-    upsertedId: result.upsertedId
-  });
+    console.log({
+        matched: result.matchedCount,
+        upsertedId: result.upsertedId,
+    });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: update quando existe; insert e `upsertedId` quando não existe.
 
 ### Exemplo 3 — atualizar elementos de array filtrados
 
-~~~javascript
+```javascript
 /**
  * @file Aplica desconto apenas a linhas elegíveis de uma encomenda.
  */
@@ -229,35 +221,35 @@ const client = new MongoClient(process.env.MONGODB_URI);
 const orderId = new ObjectId(process.env.ORDER_ID);
 
 try {
-  const orders = client.db("shop").collection("orders");
-  const result = await orders.updateOne(
-    { _id: orderId, status: "draft" },
-    {
-      $set: {
-        "items.$[item].discount": Decimal128.fromString("0.10")
-      }
-    },
-    {
-      arrayFilters: [
+    const orders = client.db("shop").collection("orders");
+    const result = await orders.updateOne(
+        { _id: orderId, status: "draft" },
         {
-          "item.category": "books",
-          "item.quantity": { $gte: 2 }
-        }
-      ]
-    }
-  );
+            $set: {
+                "items.$[item].discount": Decimal128.fromString("0.10"),
+            },
+        },
+        {
+            arrayFilters: [
+                {
+                    "item.category": "books",
+                    "item.quantity": { $gte: 2 },
+                },
+            ],
+        },
+    );
 
-  console.log(result.modifiedCount);
+    console.log(result.modifiedCount);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: todas as linhas do mesmo documento que passam `arrayFilters` recebem desconto.
 
 ### Exemplo 4 — replacement deliberado
 
-~~~javascript
+```javascript
 /**
  * @file Substitui uma configuração que é tratada como documento completo.
  */
@@ -266,36 +258,36 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const settings = client.db("app").collection("tenantSettings");
-  const replacement = {
-    tenantKey: "tenant-pt",
-    locale: "pt-PT",
-    features: {
-      search: true,
-      recommendations: false
-    },
-    version: 4,
-    updatedAt: new Date()
-  };
+    const settings = client.db("app").collection("tenantSettings");
+    const replacement = {
+        tenantKey: "tenant-pt",
+        locale: "pt-PT",
+        features: {
+            search: true,
+            recommendations: false,
+        },
+        version: 4,
+        updatedAt: new Date(),
+    };
 
-  const result = await settings.replaceOne(
-    { tenantKey: "tenant-pt", version: 3 },
-    replacement
-  );
+    const result = await settings.replaceOne(
+        { tenantKey: "tenant-pt", version: 3 },
+        replacement,
+    );
 
-  if (result.modifiedCount !== 1) {
-    throw new Error("Conflito de versão ou configuração inexistente.");
-  }
+    if (result.modifiedCount !== 1) {
+        throw new Error("Conflito de versão ou configuração inexistente.");
+    }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: substituição integral apenas se a versão atual for 3.
 
 ### Exemplo 5 — delete protegido por estado
 
-~~~javascript
+```javascript
 /**
  * @file Elimina uma sessão apenas se já tiver expirado.
  */
@@ -305,17 +297,17 @@ const client = new MongoClient(process.env.MONGODB_URI);
 const sessionId = new ObjectId(process.env.SESSION_ID);
 
 try {
-  const sessions = client.db("app").collection("sessions");
-  const result = await sessions.deleteOne({
-    _id: sessionId,
-    expiresAt: { $lt: new Date() }
-  });
+    const sessions = client.db("app").collection("sessions");
+    const result = await sessions.deleteOne({
+        _id: sessionId,
+        expiresAt: { $lt: new Date() },
+    });
 
-  console.log({ deleted: result.deletedCount });
+    console.log({ deleted: result.deletedCount });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: `deletedCount` 1 apenas para uma sessão existente e expirada.
 
@@ -440,20 +432,20 @@ Fontes oficiais: [updates no driver](https://www.mongodb.com/docs/drivers/node/c
 >
 > O resultado pretendido separa métodos com nomes semelhantes.
 
-| Método | Efeito | Retorno | Uso típico |
-|---|---|---|---|
-| `updateOne()` | altera primeiro match | `UpdateResult` | patch/contador |
-| `updateMany()` | altera todos os matches | `UpdateResult` | mudança em massa deliberada |
-| `replaceOne()` | substitui primeiro match | `UpdateResult` | replacement completo |
+| Método               | Efeito                   | Retorno          | Uso típico                   |
+| -------------------- | ------------------------ | ---------------- | ---------------------------- |
+| `updateOne()`        | altera primeiro match    | `UpdateResult`   | patch/contador               |
+| `updateMany()`       | altera todos os matches  | `UpdateResult`   | mudança em massa deliberada  |
+| `replaceOne()`       | substitui primeiro match | `UpdateResult`   | replacement completo         |
 | `findOneAndUpdate()` | altera e lê atomicamente | documento/`null` | devolver estado before/after |
-| `deleteOne()` | remove no máximo um | `DeleteResult` | identidade/filtro único |
-| `deleteMany()` | remove todos os matches | `DeleteResult` | limpeza explícita |
+| `deleteOne()`        | remove no máximo um      | `DeleteResult`   | identidade/filtro único      |
+| `deleteMany()`       | remove todos os matches  | `DeleteResult`   | limpeza explícita            |
 
 > **Ligação entre capítulos:** filtros e arrays vêm do capítulo 05; retornos atuais no capítulo 08; unique indexes para upsert no capítulo 09.
 
 ### Fluxograma de escolha
 
-~~~text
+```text
 Preciso de modificar ou substituir?
   |-- substituir documento completo --> replaceOne
   `-- modificar campos --> um match?
@@ -461,16 +453,16 @@ Preciso de modificar ou substituir?
                           `-- sim --> preciso do documento final?
                                       |-- sim --> findOneAndUpdate
                                       `-- não --> updateOne
-~~~
+```
 
 ### Mini desafio
 
 Sem executar, determina que fields permanecem em cada caso e que método devolve o documento final:
 
-~~~javascript
+```javascript
 await users.updateOne({ _id }, { $set: { name: "Ana" } });
 await users.replaceOne({ _id }, { name: "Ana" });
-~~~
+```
 
 ---
 

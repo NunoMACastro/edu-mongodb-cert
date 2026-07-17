@@ -16,11 +16,11 @@ MongoDB Search — tradicionalmente referido como Atlas Search — oferece pesqu
 
 ### Três famílias
 
-| Mecanismo | Índice | Query | Adequado a |
-|---|---|---|---|
-| B-tree MongoDB | `createIndex({ field: 1 })` | equality/range/sort | filtros estruturados |
-| text clássico | `createIndex({ field: "text" })` | `$text` | full-text básico |
-| MongoDB Search | search index | `$search` | relevância, analyzers, autocomplete, facets |
+| Mecanismo      | Índice                           | Query               | Adequado a                                  |
+| -------------- | -------------------------------- | ------------------- | ------------------------------------------- |
+| B-tree MongoDB | `createIndex({ field: 1 })`      | equality/range/sort | filtros estruturados                        |
+| text clássico  | `createIndex({ field: "text" })` | `$text`             | full-text básico                            |
+| MongoDB Search | search index                     | `$search`           | relevância, analyzers, autocomplete, facets |
 
 Não usar regex não ancorada como substituto de um motor de pesquisa. Regex carece de análise linguística, ranking relevante e escala adequada para muitos casos de search-as-you-type.
 
@@ -80,12 +80,12 @@ Na arquitetura Atlas clássica, componentes Search sincronizam alterações via 
 
 ### compound
 
-| Clause | Significado | Score |
-|---|---|---|
-| `must` | todas têm de corresponder | contribui |
-| `mustNot` | nenhuma pode corresponder | não contribui positivamente |
-| `should` | preferências; minimumShouldMatch controla exigência | contribui |
-| `filter` | todas têm de corresponder | não contribui |
+| Clause    | Significado                                         | Score                       |
+| --------- | --------------------------------------------------- | --------------------------- |
+| `must`    | todas têm de corresponder                           | contribui                   |
+| `mustNot` | nenhuma pode corresponder                           | não contribui positivamente |
+| `should`  | preferências; minimumShouldMatch controla exigência | contribui                   |
+| `filter`  | todas têm de corresponder                           | não contribui               |
 
 Usar `filter` para status, tenant, permissões e ranges que não representam relevância. Segurança não deve depender só de projection; o filtro de autorização tem de restringir candidatos.
 
@@ -99,109 +99,109 @@ Usar `filter` para status, tenant, permissões e ranges que não representam rel
 
 ### Static search index
 
-~~~javascript
+```javascript
 const searchIndex = {
-  name: "movies_search",
-  definition: {
-    mappings: {
-      dynamic: false,
-      fields: {
-        title: [
-          {
-            type: "string",
-            analyzer: "lucene.standard"
-          },
-          {
-            type: "autocomplete",
-            tokenization: "edgeGram",
-            minGrams: 2,
-            maxGrams: 15
-          }
-        ],
-        fullplot: {
-          type: "string",
-          analyzer: "lucene.english"
+    name: "movies_search",
+    definition: {
+        mappings: {
+            dynamic: false,
+            fields: {
+                title: [
+                    {
+                        type: "string",
+                        analyzer: "lucene.standard",
+                    },
+                    {
+                        type: "autocomplete",
+                        tokenization: "edgeGram",
+                        minGrams: 2,
+                        maxGrams: 15,
+                    },
+                ],
+                fullplot: {
+                    type: "string",
+                    analyzer: "lucene.english",
+                },
+                genres: {
+                    type: "string",
+                    analyzer: "lucene.keyword",
+                },
+                year: {
+                    type: "number",
+                },
+            },
         },
-        genres: {
-          type: "string",
-          analyzer: "lucene.keyword"
-        },
-        year: {
-          type: "number"
-        }
-      }
-    }
-  }
+    },
 };
-~~~
+```
 
 ### Text
 
-~~~javascript
+```javascript
 const textSearchStage = {
-  $search: {
-    index: "movies_search",
-    text: {
-      query: "space exploration",
-      path: ["title", "fullplot"],
-      fuzzy: {
-        maxEdits: 1
-      }
-    }
-  }
+    $search: {
+        index: "movies_search",
+        text: {
+            query: "space exploration",
+            path: ["title", "fullplot"],
+            fuzzy: {
+                maxEdits: 1,
+            },
+        },
+    },
 };
-~~~
+```
 
 ### Compound
 
-~~~javascript
+```javascript
 const compoundSearchStage = {
-  $search: {
-    index: "movies_search",
-    compound: {
-      must: [
-        {
-          text: {
-            query: "robot",
-            path: ["title", "fullplot"]
-          }
-        }
-      ],
-      filter: [
-        {
-          range: {
-            path: "year",
-            gte: 2000,
-            lt: 2020
-          }
-        }
-      ],
-      should: [
-        {
-          text: {
-            query: "Sci-Fi",
-            path: "genres",
-            score: { boost: { value: 2 } }
-          }
-        }
-      ]
-    }
-  }
+    $search: {
+        index: "movies_search",
+        compound: {
+            must: [
+                {
+                    text: {
+                        query: "robot",
+                        path: ["title", "fullplot"],
+                    },
+                },
+            ],
+            filter: [
+                {
+                    range: {
+                        path: "year",
+                        gte: 2000,
+                        lt: 2020,
+                    },
+                },
+            ],
+            should: [
+                {
+                    text: {
+                        query: "Sci-Fi",
+                        path: "genres",
+                        score: { boost: { value: 2 } },
+                    },
+                },
+            ],
+        },
+    },
 };
-~~~
+```
 
 ### Metadata
 
-~~~javascript
+```javascript
 const scoreProjectionStage = {
-  $project: {
-    _id: 0,
-    title: 1,
-    score: { $meta: "searchScore" },
-    highlights: { $meta: "searchHighlights" }
-  }
+    $project: {
+        _id: 0,
+        title: 1,
+        score: { $meta: "searchScore" },
+        highlights: { $meta: "searchHighlights" },
+    },
 };
-~~~
+```
 
 `searchHighlights` exige que o `$search` correspondente configure a opção `highlight`; sem essa configuração não se deve projetar highlights.
 
@@ -211,7 +211,7 @@ const scoreProjectionStage = {
 
 ### Exemplo 1 — criar um search index com o driver
 
-~~~javascript
+```javascript
 /**
  * @file Cria um search index estático para a collection movies.
  */
@@ -220,47 +220,47 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const indexName = await movies.createSearchIndex({
-    name: "movies_search",
-    definition: {
-      mappings: {
-        dynamic: false,
-        fields: {
-          title: [
-            { type: "string" },
-            {
-              type: "autocomplete",
-              tokenization: "edgeGram",
-              minGrams: 2,
-              maxGrams: 15
-            }
-          ],
-          fullplot: {
-            type: "string",
-            analyzer: "lucene.english"
-          },
-          genres: {
-            type: "string",
-            analyzer: "lucene.keyword"
-          },
-          year: { type: "number" }
-        }
-      }
-    }
-  });
+    const movies = client.db("sample_mflix").collection("movies");
+    const indexName = await movies.createSearchIndex({
+        name: "movies_search",
+        definition: {
+            mappings: {
+                dynamic: false,
+                fields: {
+                    title: [
+                        { type: "string" },
+                        {
+                            type: "autocomplete",
+                            tokenization: "edgeGram",
+                            minGrams: 2,
+                            maxGrams: 15,
+                        },
+                    ],
+                    fullplot: {
+                        type: "string",
+                        analyzer: "lucene.english",
+                    },
+                    genres: {
+                        type: "string",
+                        analyzer: "lucene.keyword",
+                    },
+                    year: { type: "number" },
+                },
+            },
+        },
+    });
 
-  console.log(indexName);
+    console.log(indexName);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: nome do índice submetido. A criação é assíncrona no serviço; aguardar que esteja queryable antes de pesquisar.
 
 ### Exemplo 2 — text search com score
 
-~~~javascript
+```javascript
 /**
  * @file Pesquisa título e descrição e devolve relevância.
  */
@@ -269,45 +269,47 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const pipeline = [
-    {
-      $search: {
-        index: "movies_search",
-        text: {
-          query: "journey through space",
-          path: ["title", "fullplot"],
-          fuzzy: { maxEdits: 1, prefixLength: 2 }
-        }
-      }
-    },
-    { $limit: 10 },
-    {
-      $project: {
-        _id: 0,
-        title: 1,
-        year: 1,
-        score: { $meta: "searchScore" }
-      }
-    }
-  ];
+    const movies = client.db("sample_mflix").collection("movies");
+    const pipeline = [
+        {
+            $search: {
+                index: "movies_search",
+                text: {
+                    query: "journey through space",
+                    path: ["title", "fullplot"],
+                    fuzzy: { maxEdits: 1, prefixLength: 2 },
+                },
+            },
+        },
+        { $limit: 10 },
+        {
+            $project: {
+                _id: 0,
+                title: 1,
+                year: 1,
+                score: { $meta: "searchScore" },
+            },
+        },
+    ];
 
-  const results = await movies.aggregate(pipeline, {
-    maxTimeMS: 5_000,
-    comment: "movies-text-search"
-  }).toArray();
+    const results = await movies
+        .aggregate(pipeline, {
+            maxTimeMS: 5_000,
+            comment: "movies-text-search",
+        })
+        .toArray();
 
-  console.table(results);
+    console.table(results);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: até dez resultados, ordenados por relevância Search.
 
 ### Exemplo 3 — compound com filtro não pontuado
 
-~~~javascript
+```javascript
 /**
  * @file Combina relevância textual, ano e género preferencial.
  */
@@ -316,65 +318,65 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const pipeline = [
-    {
-      $search: {
-        index: "movies_search",
-        compound: {
-          must: [
-            {
-              text: {
-                query: "artificial intelligence",
-                path: ["title", "fullplot"]
-              }
-            }
-          ],
-          filter: [
-            {
-              range: {
-                path: "year",
-                gte: 1990,
-                lte: 2025
-              }
-            }
-          ],
-          should: [
-            {
-              text: {
-                query: "Sci-Fi",
-                path: "genres",
-                score: { boost: { value: 3 } }
-              }
-            }
-          ]
-        }
-      }
-    },
-    { $limit: 20 },
-    {
-      $project: {
-        _id: 0,
-        title: 1,
-        year: 1,
-        genres: 1,
-        score: { $meta: "searchScore" }
-      }
-    }
-  ];
+    const movies = client.db("sample_mflix").collection("movies");
+    const pipeline = [
+        {
+            $search: {
+                index: "movies_search",
+                compound: {
+                    must: [
+                        {
+                            text: {
+                                query: "artificial intelligence",
+                                path: ["title", "fullplot"],
+                            },
+                        },
+                    ],
+                    filter: [
+                        {
+                            range: {
+                                path: "year",
+                                gte: 1990,
+                                lte: 2025,
+                            },
+                        },
+                    ],
+                    should: [
+                        {
+                            text: {
+                                query: "Sci-Fi",
+                                path: "genres",
+                                score: { boost: { value: 3 } },
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+        { $limit: 20 },
+        {
+            $project: {
+                _id: 0,
+                title: 1,
+                year: 1,
+                genres: 1,
+                score: { $meta: "searchScore" },
+            },
+        },
+    ];
 
-  const results = await movies.aggregate(pipeline).toArray();
-  console.log(results);
+    const results = await movies.aggregate(pipeline).toArray();
+    console.log(results);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: must e range são obrigatórios; Sci-Fi aumenta score sem ser obrigatório.
 
 ### Exemplo 4 — autocomplete validado
 
-~~~javascript
+```javascript
 /**
  * @file Implementa sugestões de título com input limitado.
  */
@@ -383,51 +385,51 @@ import { MongoClient } from "mongodb";
 const query = (process.env.QUERY ?? "").trim();
 
 if (query.length < 2 || query.length > 80) {
-  throw new RangeError("QUERY deve ter entre 2 e 80 caracteres.");
+    throw new RangeError("QUERY deve ter entre 2 e 80 caracteres.");
 }
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const pipeline = [
-    {
-      $search: {
-        index: "movies_search",
-        autocomplete: {
-          query,
-          path: "title",
-          tokenOrder: "sequential",
-          fuzzy: {
-            maxEdits: 1,
-            prefixLength: 1,
-            maxExpansions: 50
-          }
-        }
-      }
-    },
-    { $limit: 8 },
-    {
-      $project: {
-        _id: 0,
-        title: 1,
-        year: 1,
-        score: { $meta: "searchScore" }
-      }
-    }
-  ];
+    const movies = client.db("sample_mflix").collection("movies");
+    const pipeline = [
+        {
+            $search: {
+                index: "movies_search",
+                autocomplete: {
+                    query,
+                    path: "title",
+                    tokenOrder: "sequential",
+                    fuzzy: {
+                        maxEdits: 1,
+                        prefixLength: 1,
+                        maxExpansions: 50,
+                    },
+                },
+            },
+        },
+        { $limit: 8 },
+        {
+            $project: {
+                _id: 0,
+                title: 1,
+                year: 1,
+                score: { $meta: "searchScore" },
+            },
+        },
+    ];
 
-  console.log(await movies.aggregate(pipeline).toArray());
+    console.log(await movies.aggregate(pipeline).toArray());
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: até oito sugestões para um field indexado como autocomplete.
 
 ### Exemplo 5 — count com `$searchMeta`
 
-~~~javascript
+```javascript
 /**
  * @file Obtém metadata de contagem sem devolver os filmes.
  */
@@ -436,27 +438,29 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const metadata = await movies.aggregate([
-    {
-      $searchMeta: {
-        index: "movies_search",
-        text: {
-          query: "mongodb",
-          path: ["title", "fullplot"]
-        },
-        count: {
-          type: "total"
-        }
-      }
-    }
-  ]).next();
+    const movies = client.db("sample_mflix").collection("movies");
+    const metadata = await movies
+        .aggregate([
+            {
+                $searchMeta: {
+                    index: "movies_search",
+                    text: {
+                        query: "mongodb",
+                        path: ["title", "fullplot"],
+                    },
+                    count: {
+                        type: "total",
+                    },
+                },
+            },
+        ])
+        .next();
 
-  console.log(metadata);
+    console.log(metadata);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: documento de metadata com count, não uma lista de filmes.
 
@@ -588,18 +592,18 @@ Fontes oficiais: [MongoDB Search](https://www.mongodb.com/docs/search/), [querie
 >
 > Três mecanismos de pesquisa coexistem, mas não partilham o mesmo índice.
 
-| Mecanismo | Índice | Query | Força principal |
-|---|---|---|---|
-| B-tree | `createIndex({ field: 1 })` | `find()`/`$match` | equality, range, sort |
-| text clássico | text index | `$text` | full-text básico |
-| MongoDB Search | search index | `$search` | analyzers, score, autocomplete, facets |
-| `$searchMeta` | search index | metadata | count/facets sem documentos normais |
+| Mecanismo      | Índice                      | Query             | Força principal                        |
+| -------------- | --------------------------- | ----------------- | -------------------------------------- |
+| B-tree         | `createIndex({ field: 1 })` | `find()`/`$match` | equality, range, sort                  |
+| text clássico  | text index                  | `$text`           | full-text básico                       |
+| MongoDB Search | search index                | `$search`         | analyzers, score, autocomplete, facets |
+| `$searchMeta`  | search index                | metadata          | count/facets sem documentos normais    |
 
 > **Ligação entre capítulos:** aggregation e primeira posição de stage estão no capítulo 10; execução pelo driver no 11; B-tree/compound indexes no 09.
 
 ### Mapa mental de Search
 
-~~~text
+```text
 documentos MongoDB
       |
       v
@@ -611,7 +615,7 @@ $search / $searchMeta
       +-> compound.filter  restringe sem score
       +-> must / should    correspondência + score
       `-> project          score / highlights / fields
-~~~
+```
 
 ### Mini desafio
 

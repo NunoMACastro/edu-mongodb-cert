@@ -16,19 +16,19 @@
 
 `insertOne(document, options)` insere um documento. Se `_id` estiver ausente, o driver atribui normalmente um `ObjectId` antes do envio. `insertMany(documents, options)` envia vários documentos e, por defeito, é ordered: para no primeiro erro. Com `ordered: false`, o servidor pode continuar operações independentes e a ordem de execução não deve ser assumida.
 
-| Método | Input | Resultado normal |
-|---|---|---|
-| `insertOne` | documento | `InsertOneResult` com `insertedId` |
-| `insertMany` | array | `InsertManyResult` com `insertedCount` e `insertedIds` |
+| Método       | Input     | Resultado normal                                       |
+| ------------ | --------- | ------------------------------------------------------ |
+| `insertOne`  | documento | `InsertOneResult` com `insertedId`                     |
+| `insertMany` | array     | `InsertManyResult` com `insertedCount` e `insertedIds` |
 
 Um acknowledgement não significa que o documento satisfaz regras de negócio que não foram validadas. Unique indexes, schema validation e write concern são mecanismos distintos.
 
 ### find versus findOne
 
-| Método | Devolve | Ausência | Cardinalidade |
-|---|---|---|---|
-| `find(filter, options)` | `FindCursor` | cursor vazio | zero a muitos |
-| `findOne(filter, options)` | documento/`null` | `null` | zero ou um |
+| Método                     | Devolve          | Ausência     | Cardinalidade |
+| -------------------------- | ---------------- | ------------ | ------------- |
+| `find(filter, options)`    | `FindCursor`     | cursor vazio | zero a muitos |
+| `findOne(filter, options)` | documento/`null` | `null`       | zero ou um    |
 
 `findOne()` não significa que o filtro identifica univocamente um documento; apenas devolve um match. Se a regra exige unicidade, criar unique index.
 
@@ -36,22 +36,22 @@ Um acknowledgement não significa que o documento satisfaz regras de negócio qu
 
 Um filter document combina condições ao mesmo nível com AND implícito:
 
-~~~javascript
+```javascript
 const filter = {
-  year: { $gte: 2000 },
-  genres: "Drama"
+    year: { $gte: 2000 },
+    genres: "Drama",
 };
-~~~
+```
 
 Operadores essenciais:
 
-| Família | Operadores |
-|---|---|
+| Família    | Operadores                                                |
+| ---------- | --------------------------------------------------------- |
 | comparação | `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin` |
-| lógica | `$and`, `$or`, `$nor`, `$not` |
-| elemento | `$exists`, `$type` |
-| array | `$all`, `$elemMatch`, `$size` |
-| avaliação | `$regex`, `$expr`, `$text` quando existe text index |
+| lógica     | `$and`, `$or`, `$nor`, `$not`                             |
+| elemento   | `$exists`, `$type`                                        |
+| array      | `$all`, `$elemMatch`, `$size`                             |
+| avaliação  | `$regex`, `$expr`, `$text` quando existe text index       |
 
 `$in` corresponde a qualquer valor da lista. `$all` exige que um array contenha todos. `$elemMatch` exige que um mesmo elemento satisfaça todas as condições.
 
@@ -59,15 +59,23 @@ Operadores essenciais:
 
 `{ field: null }` corresponde normalmente a documentos em que `field` é `null` **ou não existe**. Para exigir `null` explícito:
 
-~~~javascript
-{ field: { $type: 10 } }
-~~~
+```javascript
+{
+    field: {
+        $type: 10;
+    }
+}
+```
 
 Para exigir existência:
 
-~~~javascript
-{ field: { $exists: true } }
-~~~
+```javascript
+{
+    field: {
+        $exists: true;
+    }
+}
+```
 
 O código numérico 10 é BSON Null; a forma por alias, quando aceite no contexto, é mais legível.
 
@@ -101,57 +109,57 @@ Igualdade a um scalar sobre um campo array corresponde se algum elemento for igu
 
 ### Insert
 
-~~~javascript
+```javascript
 const oneResult = await collection.insertOne(document, {
-  writeConcern: { w: "majority" }
+    writeConcern: { w: "majority" },
 });
 
 const manyResult = await collection.insertMany(documents, {
-  ordered: false
+    ordered: false,
 });
-~~~
+```
 
 ### Find
 
-~~~javascript
+```javascript
 const cursor = collection.find(filter, {
-  projection,
-  sort,
-  limit,
-  maxTimeMS,
-  hint,
-  collation
+    projection,
+    sort,
+    limit,
+    maxTimeMS,
+    hint,
+    collation,
 });
 
 const document = await collection.findOne(filter, {
-  projection,
-  sort,
-  maxTimeMS
+    projection,
+    sort,
+    maxTimeMS,
 });
-~~~
+```
 
 `sort` em `findOne()` escolhe que match devolver quando existem vários; não cria unicidade.
 
 ### Filtros frequentes
 
-~~~javascript
+```javascript
 const exampleFilters = [
-  { year: 1999 },
-  { year: { $gte: 1990, $lt: 2000 } },
-  { genres: { $in: ["Drama", "Comedy"] } },
-  { $or: [{ rated: "G" }, { "imdb.rating": { $gte: 8.5 } }] },
-  { cast: { $all: ["Keanu Reeves", "Laurence Fishburne"] } },
-  { "awards.wins": { $exists: true, $gt: 0 } },
-  {
-    comments: {
-      $elemMatch: {
-        author: "Ana",
-        approved: true
-      }
-    }
-  }
+    { year: 1999 },
+    { year: { $gte: 1990, $lt: 2000 } },
+    { genres: { $in: ["Drama", "Comedy"] } },
+    { $or: [{ rated: "G" }, { "imdb.rating": { $gte: 8.5 } }] },
+    { cast: { $all: ["Keanu Reeves", "Laurence Fishburne"] } },
+    { "awards.wins": { $exists: true, $gt: 0 } },
+    {
+        comments: {
+            $elemMatch: {
+                author: "Ana",
+                approved: true,
+            },
+        },
+    },
 ];
-~~~
+```
 
 ---
 
@@ -159,7 +167,7 @@ const exampleFilters = [
 
 ### Exemplo 1 — insertOne idempotente por unique key
 
-~~~javascript
+```javascript
 /**
  * @file Insere um utilizador cuja unicidade deve ser garantida por índice.
  */
@@ -168,27 +176,27 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const users = client.db("certification_lab").collection("users");
-  await users.createIndex({ email: 1 }, { unique: true });
+    const users = client.db("certification_lab").collection("users");
+    await users.createIndex({ email: 1 }, { unique: true });
 
-  const result = await users.insertOne({
-    email: "ana@example.com",
-    displayName: "Ana",
-    roles: ["reader"],
-    createdAt: new Date()
-  });
+    const result = await users.insertOne({
+        email: "ana@example.com",
+        displayName: "Ana",
+        roles: ["reader"],
+        createdAt: new Date(),
+    });
 
-  console.log(result.insertedId);
+    console.log(result.insertedId);
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: um `insertedId`; uma segunda inserção com o mesmo email falha com duplicate key.
 
 ### Exemplo 2 — insertMany unordered
 
-~~~javascript
+```javascript
 /**
  * @file Insere eventos independentes e permite continuar após erros isolados.
  */
@@ -197,28 +205,28 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const events = client.db("certification_lab").collection("events");
-  const documents = [
-    { eventId: "evt-101", type: "view", occurredAt: new Date() },
-    { eventId: "evt-102", type: "click", occurredAt: new Date() },
-    { eventId: "evt-103", type: "purchase", occurredAt: new Date() }
-  ];
+    const events = client.db("certification_lab").collection("events");
+    const documents = [
+        { eventId: "evt-101", type: "view", occurredAt: new Date() },
+        { eventId: "evt-102", type: "click", occurredAt: new Date() },
+        { eventId: "evt-103", type: "purchase", occurredAt: new Date() },
+    ];
 
-  const result = await events.insertMany(documents, { ordered: false });
-  console.log({
-    insertedCount: result.insertedCount,
-    insertedIds: result.insertedIds
-  });
+    const result = await events.insertMany(documents, { ordered: false });
+    console.log({
+        insertedCount: result.insertedCount,
+        insertedIds: result.insertedIds,
+    });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: acknowledgement por documento inserido. Perante erro parcial, `insertMany()` lança; o `catch` deve inspecionar o bulk write error se a aplicação precisar dos sucessos.
 
 ### Exemplo 3 — filtros compostos e cursor
 
-~~~javascript
+```javascript
 /**
  * @file Encontra filmes com condições escalares, nested e de array.
  */
@@ -227,36 +235,33 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const filter = {
-    year: { $gte: 2000, $lt: 2010 },
-    genres: { $all: ["Action", "Sci-Fi"] },
-    "imdb.rating": { $gte: 7.5 },
-    $or: [
-      { rated: "PG-13" },
-      { rated: "R" }
-    ]
-  };
+    const movies = client.db("sample_mflix").collection("movies");
+    const filter = {
+        year: { $gte: 2000, $lt: 2010 },
+        genres: { $all: ["Action", "Sci-Fi"] },
+        "imdb.rating": { $gte: 7.5 },
+        $or: [{ rated: "PG-13" }, { rated: "R" }],
+    };
 
-  const cursor = movies
-    .find(filter)
-    .project({ _id: 0, title: 1, year: 1, genres: 1, "imdb.rating": 1 })
-    .sort({ "imdb.rating": -1, title: 1 })
-    .limit(25);
+    const cursor = movies
+        .find(filter)
+        .project({ _id: 0, title: 1, year: 1, genres: 1, "imdb.rating": 1 })
+        .sort({ "imdb.rating": -1, title: 1 })
+        .limit(25);
 
-  for await (const movie of cursor) {
-    console.log(movie);
-  }
+    for await (const movie of cursor) {
+        console.log(movie);
+    }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: até 25 filmes que satisfazem todas as condições de topo e uma alternativa de rating.
 
 ### Exemplo 4 — `$elemMatch` evita combinação entre elementos
 
-~~~javascript
+```javascript
 /**
  * @file Encontra restaurantes com uma mesma avaliação recente e alta.
  */
@@ -265,34 +270,34 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const restaurants = client
-    .db("sample_restaurants")
-    .collection("restaurants");
+    const restaurants = client
+        .db("sample_restaurants")
+        .collection("restaurants");
 
-  const result = await restaurants.findOne(
-    {
-      grades: {
-        $elemMatch: {
-          grade: "A",
-          score: { $lte: 5 }
-        }
-      }
-    },
-    {
-      projection: {
-        _id: 0,
-        name: 1,
-        borough: 1,
-        grades: { $elemMatch: { grade: "A", score: { $lte: 5 } } }
-      }
-    }
-  );
+    const result = await restaurants.findOne(
+        {
+            grades: {
+                $elemMatch: {
+                    grade: "A",
+                    score: { $lte: 5 },
+                },
+            },
+        },
+        {
+            projection: {
+                _id: 0,
+                name: 1,
+                borough: 1,
+                grades: { $elemMatch: { grade: "A", score: { $lte: 5 } } },
+            },
+        },
+    );
 
-  console.dir(result, { depth: null });
+    console.dir(result, { depth: null });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: documento ou `null`; a projection `$elemMatch` devolve apenas o primeiro elemento correspondente.
 
@@ -409,34 +414,34 @@ Fontes oficiais: [insert no driver](https://www.mongodb.com/docs/drivers/node/cu
 >
 > Cardinalidade pedida e tipo de retorno determinam o método.
 
-| Método | Cardinalidade | Retorno | Atenção |
-|---|---:|---|---|
-| `insertOne()` | um insert | `InsertOneResult` | `insertedId` |
-| `insertMany()` | vários inserts | `InsertManyResult` | partial failure possível |
-| `find()` | zero a muitos | `FindCursor` | só executa/consome ao iterar |
-| `findOne()` | zero ou um | documento/`null` | não devolve cursor |
+| Método         |  Cardinalidade | Retorno            | Atenção                      |
+| -------------- | -------------: | ------------------ | ---------------------------- |
+| `insertOne()`  |      um insert | `InsertOneResult`  | `insertedId`                 |
+| `insertMany()` | vários inserts | `InsertManyResult` | partial failure possível     |
+| `find()`       |  zero a muitos | `FindCursor`       | só executa/consome ao iterar |
+| `findOne()`    |     zero ou um | documento/`null`   | não devolve cursor           |
 
 > **Ligação entre capítulos:** projections e limits são aprofundados no capítulo 07; lifecycle de cursor no 08; índices para filtros no 09.
 
 ### Mapa mental de leitura
 
-~~~text
+```text
 Preciso de um documento?
   |-- sim --> findOne(filter) -> document | null
   `-- não --> find(filter) -> cursor
                           |
                           +-> project / sort / limit
                           `-> next / for await / toArray
-~~~
+```
 
 ### Mini desafio
 
 Prevê se as duas queries seguintes são equivalentes quando `scores` é um array e justifica sem as executar:
 
-~~~javascript
+```javascript
 const a = { scores: { $gte: 80, $lt: 90 } };
 const b = { scores: { $elemMatch: { $gte: 80, $lt: 90 } } };
-~~~
+```
 
 ---
 

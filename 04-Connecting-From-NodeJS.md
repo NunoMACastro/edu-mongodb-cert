@@ -33,13 +33,13 @@ Scripts e CLIs de curta duração devem fechar o cliente num `finally`. Um servi
 
 Cada servidor da topologia tem um pool. Opções importantes:
 
-| Opção | Default documentado | Função |
-|---|---:|---|
-| `maxPoolSize` | 100 | máximo de ligações em uso + disponíveis por pool |
-| `minPoolSize` | 0 | mínimo mantido |
-| `maxConnecting` | 2 | criações concorrentes |
-| `maxIdleTimeMS` | 0 | idade idle ilimitada |
-| `waitQueueTimeoutMS` | 0 | espera ilimitada por checkout |
+| Opção                | Default documentado | Função                                           |
+| -------------------- | ------------------: | ------------------------------------------------ |
+| `maxPoolSize`        |                 100 | máximo de ligações em uso + disponíveis por pool |
+| `minPoolSize`        |                   0 | mínimo mantido                                   |
+| `maxConnecting`      |                   2 | criações concorrentes                            |
+| `maxIdleTimeMS`      |                   0 | idade idle ilimitada                             |
+| `waitQueueTimeoutMS` |                   0 | espera ilimitada por checkout                    |
 
 `maxPoolSize` limita ligações usadas por operações. Além do pool, cada `MongoClient` abre até duas ligações de monitorização por servidor da topologia; estas não entram nesse limite.
 
@@ -78,9 +78,9 @@ Uma eleição pode deixar temporariamente sem primary. Retryable writes/reads co
 
 ### Fases e timeouts
 
-~~~text
+```text
 server selection → pool checkout → socket/connect → comando no servidor → resposta
-~~~
+```
 
 - `serverSelectionTimeoutMS`: encontrar servidor.
 - `waitQueueTimeoutMS`: obter ligação do pool.
@@ -101,43 +101,43 @@ O driver converte JavaScript para BSON. Tipos BSON sem equivalente seguro usam c
 
 ### Cliente de produção
 
-~~~javascript
+```javascript
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 const client = new MongoClient(process.env.MONGODB_URI, {
-  appName: "orders-api",
-  maxPoolSize: 50,
-  minPoolSize: 0,
-  maxConnecting: 2,
-  waitQueueTimeoutMS: 2_000,
-  serverSelectionTimeoutMS: 5_000,
-  connectTimeoutMS: 10_000,
-  retryReads: true,
-  retryWrites: true,
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true
-  }
+    appName: "orders-api",
+    maxPoolSize: 50,
+    minPoolSize: 0,
+    maxConnecting: 2,
+    waitQueueTimeoutMS: 2_000,
+    serverSelectionTimeoutMS: 5_000,
+    connectTimeoutMS: 10_000,
+    retryReads: true,
+    retryWrites: true,
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    },
 });
-~~~
+```
 
 Os valores são exemplos, não defaults universais para qualquer workload. Devem derivar de SLO, concorrência, número de processos e capacidade do deployment.
 
 ### Selecionar database e collection
 
-~~~javascript
+```javascript
 const database = client.db("sample_mflix");
 const movies = database.collection("movies");
-~~~
+```
 
 Isto cria handles. A primeira operação realiza I/O se ainda não houver ligação.
 
 ### Encerrar
 
-~~~javascript
+```javascript
 await client.close();
-~~~
+```
 
 No driver 7.4+, resource management com `await using` está estável em runtimes compatíveis, mas `try/finally` continua explícito e amplamente compreendido. Não misturar ciclos de vida: quem recebe um client partilhado não o deve fechar.
 
@@ -147,7 +147,7 @@ No driver 7.4+, resource management com `await using` está estável em runtimes
 
 ### Exemplo 1 — módulo partilhado com startup e shutdown
 
-~~~javascript
+```javascript
 /**
  * @file Gere o único MongoClient do processo e o respetivo ciclo de vida.
  */
@@ -156,73 +156,73 @@ import { MongoClient, ServerApiVersion } from "mongodb";
 const uri = process.env.MONGODB_URI;
 
 if (!uri) {
-  throw new Error("MONGODB_URI é obrigatória.");
+    throw new Error("MONGODB_URI é obrigatória.");
 }
 
 export const mongoClient = new MongoClient(uri, {
-  appName: "catalog-api",
-  maxPoolSize: 40,
-  waitQueueTimeoutMS: 2_000,
-  serverSelectionTimeoutMS: 5_000,
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true
-  }
+    appName: "catalog-api",
+    maxPoolSize: 40,
+    waitQueueTimeoutMS: 2_000,
+    serverSelectionTimeoutMS: 5_000,
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    },
 });
 
 /**
  * Estabelece a ligação inicial e prova uma round trip ao servidor.
  */
 export async function connectToMongoDB() {
-  await mongoClient.connect();
-  await mongoClient.db("admin").command({ ping: 1 });
+    await mongoClient.connect();
+    await mongoClient.db("admin").command({ ping: 1 });
 }
 
 /**
  * Fecha pools e monitoring durante o graceful shutdown.
  */
 export async function disconnectFromMongoDB() {
-  await mongoClient.close();
+    await mongoClient.close();
 }
-~~~
+```
 
 Resultado: um módulo importável que não cria clientes por request.
 
 ### Exemplo 2 — servidor HTTP com ciclo de vida correto
 
-~~~javascript
+```javascript
 /**
  * @file Expõe um endpoint de health sem criar clientes por pedido.
  */
 import http from "node:http";
 import {
-  connectToMongoDB,
-  disconnectFromMongoDB,
-  mongoClient
+    connectToMongoDB,
+    disconnectFromMongoDB,
+    mongoClient,
 } from "./mongo-client.mjs";
 
 await connectToMongoDB();
 
 const server = http.createServer(async (request, response) => {
-  if (request.url !== "/movies/count" || request.method !== "GET") {
-    response.writeHead(404).end();
-    return;
-  }
+    if (request.url !== "/movies/count" || request.method !== "GET") {
+        response.writeHead(404).end();
+        return;
+    }
 
-  try {
-    const movies = mongoClient.db("sample_mflix").collection("movies");
-    const count = await movies.countDocuments(
-      { year: { $gte: 2000 } },
-      { maxTimeMS: 2_000 }
-    );
+    try {
+        const movies = mongoClient.db("sample_mflix").collection("movies");
+        const count = await movies.countDocuments(
+            { year: { $gte: 2000 } },
+            { maxTimeMS: 2_000 },
+        );
 
-    response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ count }));
-  } catch {
-    response.writeHead(503, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: "database_unavailable" }));
-  }
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ count }));
+    } catch {
+        response.writeHead(503, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: "database_unavailable" }));
+    }
 });
 
 server.listen(3000);
@@ -235,45 +235,45 @@ let isShuttingDown = false;
  * @param {NodeJS.Signals} signal Signal que iniciou o encerramento.
  */
 async function shutdown(signal) {
-  if (isShuttingDown) {
-    return;
-  }
-
-  isShuttingDown = true;
-
-  try {
-    await new Promise((resolve, reject) => {
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
-  } catch (error) {
-    console.error("Falha ao fechar o servidor HTTP.", { signal, error });
-    process.exitCode = 1;
-  } finally {
-    try {
-      await disconnectFromMongoDB();
-    } catch (error) {
-      console.error("Falha ao fechar o MongoClient.", { signal, error });
-      process.exitCode = 1;
+    if (isShuttingDown) {
+        return;
     }
-  }
+
+    isShuttingDown = true;
+
+    try {
+        await new Promise((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve();
+            });
+        });
+    } catch (error) {
+        console.error("Falha ao fechar o servidor HTTP.", { signal, error });
+        process.exitCode = 1;
+    } finally {
+        try {
+            await disconnectFromMongoDB();
+        } catch (error) {
+            console.error("Falha ao fechar o MongoClient.", { signal, error });
+            process.exitCode = 1;
+        }
+    }
 }
 
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
-~~~
+```
 
 Resultado: cada pedido reutiliza o pool; o shutdown deixa de aceitar novos pedidos, aguarda os pedidos ativos e só depois fecha o client.
 
 ### Exemplo 3 — separar erro de configuração de falha operacional
 
-~~~javascript
+```javascript
 /**
  * @file Executa um health check e preserva a causa original do erro.
  */
@@ -282,28 +282,28 @@ import { MongoClient } from "mongodb";
 const uri = process.env.MONGODB_URI;
 
 if (!uri) {
-  throw new Error("Configuração inválida: MONGODB_URI ausente.");
+    throw new Error("Configuração inválida: MONGODB_URI ausente.");
 }
 
 const client = new MongoClient(uri, {
-  appName: "diagnostic-check",
-  serverSelectionTimeoutMS: 3_000
+    appName: "diagnostic-check",
+    serverSelectionTimeoutMS: 3_000,
 });
 
 try {
-  await client.connect();
-  await client.db("admin").command({ ping: 1 });
-  console.log("MongoDB disponível.");
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+    console.log("MongoDB disponível.");
 } catch (error) {
-  console.error("Falha ao ligar ou executar ping.", {
-    name: error.name,
-    message: error.message
-  });
-  process.exitCode = 1;
+    console.error("Falha ao ligar ou executar ping.", {
+        name: error.name,
+        message: error.message,
+    });
+    process.exitCode = 1;
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: exit code 0 em sucesso e 1 em falha, sem imprimir a URI.
 
@@ -417,19 +417,19 @@ Fontes oficiais: [ligar com o Node.js Driver](https://www.mongodb.com/docs/drive
 >
 > Escolhe o timeout pela fase que pretendes limitar.
 
-| Opção | Fase | Sintoma típico |
-|---|---|---|
-| `serverSelectionTimeoutMS` | encontrar servidor elegível | topology sem candidato |
-| `waitQueueTimeoutMS` | obter socket do pool | pool saturado |
-| `connectTimeoutMS` | abrir ligação | TCP/TLS lento |
-| `socketTimeoutMS` | I/O no socket | comunicação sem progresso |
-| `maxTimeMS` | execução no servidor | comando excede prazo |
+| Opção                      | Fase                        | Sintoma típico            |
+| -------------------------- | --------------------------- | ------------------------- |
+| `serverSelectionTimeoutMS` | encontrar servidor elegível | topology sem candidato    |
+| `waitQueueTimeoutMS`       | obter socket do pool        | pool saturado             |
+| `connectTimeoutMS`         | abrir ligação               | TCP/TLS lento             |
+| `socketTimeoutMS`          | I/O no socket               | comunicação sem progresso |
+| `maxTimeMS`                | execução no servidor        | comando excede prazo      |
 
 > **Ligação entre capítulos:** a URI e TLS vêm do capítulo 03; cursores e backpressure dos capítulos 07–08; sessions e transactions do capítulo 12.
 
 ### Fluxo de ciclo de vida
 
-~~~text
+```text
 Processo inicia
    |
    v
@@ -443,7 +443,7 @@ reutilizar db/collection + pool em todos os pedidos
    |
    v
 parar listener -> aguardar pedidos -> close() no shutdown
-~~~
+```
 
 ### Mini desafio
 

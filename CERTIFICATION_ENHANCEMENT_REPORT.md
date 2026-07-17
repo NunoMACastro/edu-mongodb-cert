@@ -34,18 +34,18 @@ O conjunto passou a privilegiar quatro operações mentais relevantes para escol
 
 ## Cobertura quantitativa
 
-| Elemento | Quantidade final |
-|---|---:|
-| capítulos enriquecidos | 15 |
-| caixas pedagógicas novas | 60 |
-| mapas mentais/fluxogramas | 15 |
-| mini desafios | 15 |
-| perguntas de autoavaliação sem resposta | 155 |
-| checklists de capítulo novas | 15 |
-| itens de checklist no conjunto | 159 |
-| tabelas no conjunto | 51 |
-| blocos JavaScript | 107 |
-| palavras nos 15 capítulos | aproximadamente 38 500 |
+| Elemento                                |       Quantidade final |
+| --------------------------------------- | ---------------------: |
+| capítulos enriquecidos                  |                     15 |
+| caixas pedagógicas novas                |                     60 |
+| mapas mentais/fluxogramas               |                     15 |
+| mini desafios                           |                     15 |
+| perguntas de autoavaliação sem resposta |                    155 |
+| checklists de capítulo novas            |                     15 |
+| itens de checklist no conjunto          |                    159 |
+| tabelas no conjunto                     |                     51 |
+| blocos JavaScript                       |                    107 |
+| palavras nos 15 capítulos               | aproximadamente 38 500 |
 
 Foram criadas 10 perguntas por capítulo entre `00` e `13` e 15 perguntas no resumo final. Todos os capítulos cumprem, portanto, o intervalo pedido de 10 a 20 perguntas.
 
@@ -53,24 +53,24 @@ Foram criadas 10 perguntas por capítulo entre `00` e `13` e 15 perguntas no res
 
 Foram acrescentadas 16 tabelas comparativas, para um total de 51 tabelas no manual:
 
-| Capítulo | Comparação acrescentada |
-|---|---|
-| 00 | Server, Atlas, `mongosh` e Node.js Driver |
-| 01 | Atlas user, database user, Network Access, replica set e sharding |
-| 02 | embedding versus referencing |
-| 03 | `mongodb://` versus `mongodb+srv://` |
-| 04 | timeouts por fase de ligação/operação |
-| 05 | `insertOne`, `insertMany`, `find` e `findOne` |
-| 06 | update, replace, compound update e delete |
-| 07 | projection, limit, batch size, skip e contagens |
-| 08 | famílias de retorno do CRUD |
-| 09 | single, compound, multikey, unique, partial e covered |
-| 10 | `find()` versus `aggregate()` |
-| 11 | formas de consumir `AggregationCursor` |
-| 12 | write atómico, transação, outbox e APIs de transaction |
-| 13 | B-tree, text index, Search e `$searchMeta` |
-| 99 | sinais da pergunta e família de solução |
-| 99 | plano de revisão da véspera em 30 minutos |
+| Capítulo | Comparação acrescentada                                           |
+| -------- | ----------------------------------------------------------------- |
+| 00       | Server, Atlas, `mongosh` e Node.js Driver                         |
+| 01       | Atlas user, database user, Network Access, replica set e sharding |
+| 02       | embedding versus referencing                                      |
+| 03       | `mongodb://` versus `mongodb+srv://`                              |
+| 04       | timeouts por fase de ligação/operação                             |
+| 05       | `insertOne`, `insertMany`, `find` e `findOne`                     |
+| 06       | update, replace, compound update e delete                         |
+| 07       | projection, limit, batch size, skip e contagens                   |
+| 08       | famílias de retorno do CRUD                                       |
+| 09       | single, compound, multikey, unique, partial e covered             |
+| 10       | `find()` versus `aggregate()`                                     |
+| 11       | formas de consumir `AggregationCursor`                            |
+| 12       | write atómico, transação, outbox e APIs de transaction            |
+| 13       | B-tree, text index, Search e `$searchMeta`                        |
+| 99       | sinais da pergunta e família de solução                           |
+| 99       | plano de revisão da véspera em 30 minutos                         |
 
 As comparações pré-existentes do resumo final foram mantidas, incluindo query operators, comparison operators, logical operators, array operators, update operators, aggregation stages, accumulators/expressions, index types, BSON types e métodos do Node.js Driver.
 
@@ -168,18 +168,18 @@ As tabelas completas já existentes de operadores, stages, tipos, índices e mé
 
 ## Pontos considerados de elevada probabilidade
 
-| Prioridade | Conteúdo | Razão pedagógica |
-|---|---|---|
-| Muito Alta | retornos de `find`, `findOne`, updates e compound methods | alternativas diferem por shape/consumo |
-| Muito Alta | update versus replace | ambos alteram, mas só um preserva fields omitidos |
-| Muito Alta | arrays e `$elemMatch` | condições podem pertencer a elementos diferentes |
-| Muito Alta | projection, limit e batch size | controlam dimensões diferentes |
-| Muito Alta | compound/multikey e ESR | ordem e arrays criam restrições específicas |
-| Muito Alta | stage/expression/accumulator | mesma notação `$` esconde papéis diferentes |
-| Muito Alta | sessions e retries | código pode “funcionar” fora da transação |
-| Alta | Atlas/network/auth/roles | falhas semelhantes surgem em camadas distintas |
-| Alta | cursor consumption e memória | `toArray()` é correto apenas com output controlado |
-| Alta | Search index versus B-tree | índices e operadores não são intercambiáveis |
+| Prioridade | Conteúdo                                                  | Razão pedagógica                                   |
+| ---------- | --------------------------------------------------------- | -------------------------------------------------- |
+| Muito Alta | retornos de `find`, `findOne`, updates e compound methods | alternativas diferem por shape/consumo             |
+| Muito Alta | update versus replace                                     | ambos alteram, mas só um preserva fields omitidos  |
+| Muito Alta | arrays e `$elemMatch`                                     | condições podem pertencer a elementos diferentes   |
+| Muito Alta | projection, limit e batch size                            | controlam dimensões diferentes                     |
+| Muito Alta | compound/multikey e ESR                                   | ordem e arrays criam restrições específicas        |
+| Muito Alta | stage/expression/accumulator                              | mesma notação `$` esconde papéis diferentes        |
+| Muito Alta | sessions e retries                                        | código pode “funcionar” fora da transação          |
+| Alta       | Atlas/network/auth/roles                                  | falhas semelhantes surgem em camadas distintas     |
+| Alta       | cursor consumption e memória                              | `toArray()` é correto apenas com output controlado |
+| Alta       | Search index versus B-tree                                | índices e operadores não são intercambiáveis       |
 
 Estas probabilidades são prioridades pedagógicas baseadas no syllabus e nas distinções públicas do produto. Não representam informação confidencial nem frequência confirmada de perguntas reais.
 

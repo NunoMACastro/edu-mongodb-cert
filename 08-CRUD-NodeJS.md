@@ -14,17 +14,17 @@
 
 ### Mapeamento das APIs
 
-| Intenção | Método | Resultado |
-|---|---|---|
-| criar um | `insertOne` | `InsertOneResult` |
-| criar vários | `insertMany` | `InsertManyResult` |
-| ler um | `findOne` | documento/`null` |
-| ler vários | `find` | `FindCursor` |
-| alterar campos | `updateOne/Many` | `UpdateResult` |
-| substituir | `replaceOne` | `UpdateResult` |
-| eliminar | `deleteOne/Many` | `DeleteResult` |
+| Intenção                   | Método             | Resultado                    |
+| -------------------------- | ------------------ | ---------------------------- |
+| criar um                   | `insertOne`        | `InsertOneResult`            |
+| criar vários               | `insertMany`       | `InsertManyResult`           |
+| ler um                     | `findOne`          | documento/`null`             |
+| ler vários                 | `find`             | `FindCursor`                 |
+| alterar campos             | `updateOne/Many`   | `UpdateResult`               |
+| substituir                 | `replaceOne`       | `UpdateResult`               |
+| eliminar                   | `deleteOne/Many`   | `DeleteResult`               |
 | ler + alterar atomicamente | `findOneAndUpdate` | documento/`null` por defeito |
-| lote heterogéneo | `bulkWrite` | `BulkWriteResult` |
+| lote heterogéneo           | `bulkWrite`        | `BulkWriteResult`            |
 
 No driver atual, compound operations devolvem por defeito o documento diretamente porque `includeResultMetadata` é `false`. Com `includeResultMetadata: true` devolvem um `ModifyResult` com `value` e metadata. Exemplos antigos que usam sempre `result.value` podem estar errados para a versão atual.
 
@@ -85,45 +85,41 @@ Não basear lógica só em texto da mensagem. Usar classes/codes documentados e 
 
 ### findOneAndUpdate atual
 
-~~~javascript
-const updatedDocument = await collection.findOneAndUpdate(
-  filter,
-  update,
-  {
+```javascript
+const updatedDocument = await collection.findOneAndUpdate(filter, update, {
     returnDocument: "after",
     projection: { sensitiveField: 0 },
     upsert: false,
-    includeResultMetadata: false
-  }
-);
-~~~
+    includeResultMetadata: false,
+});
+```
 
 `updatedDocument` é documento ou `null`. Com `includeResultMetadata: true`, o documento fica em `result.value`.
 
 ### bulkWrite
 
-~~~javascript
+```javascript
 const result = await collection.bulkWrite(
-  [
-    { insertOne: { document } },
-    { updateOne: { filter, update, upsert: true } },
-    { deleteOne: { filter } },
-    { replaceOne: { filter, replacement } }
-  ],
-  { ordered: false }
+    [
+        { insertOne: { document } },
+        { updateOne: { filter, update, upsert: true } },
+        { deleteOne: { filter } },
+        { replaceOne: { filter, replacement } },
+    ],
+    { ordered: false },
 );
-~~~
+```
 
 ### Hint, timeout e comment
 
-~~~javascript
+```javascript
 const cursor = collection.find(filter, {
-  projection,
-  hint: { status: 1, createdAt: -1 },
-  maxTimeMS: 2_000,
-  comment: "list-recent-active-orders"
+    projection,
+    hint: { status: 1, createdAt: -1 },
+    maxTimeMS: 2_000,
+    comment: "list-recent-active-orders",
 });
-~~~
+```
 
 `hint` força um índice e pode falhar se não existir. Usar apenas quando existe evidência e gestão coordenada do ciclo de vida do índice.
 
@@ -133,7 +129,7 @@ const cursor = collection.find(filter, {
 
 ### Exemplo 1 — repository com validação e optimistic concurrency
 
-~~~javascript
+```javascript
 /**
  * @file Repository de perfis com atualização concorrente por versão.
  */
@@ -145,48 +141,55 @@ import { ObjectId } from "mongodb";
  * @param {import("mongodb").Collection} profiles Collection partilhada.
  */
 export function createProfileRepository(profiles) {
-  return {
-    /**
-     * Altera o display name se a versão observada ainda for atual.
-     */
-    async updateDisplayName({ profileId, expectedVersion, displayName }) {
-      if (!ObjectId.isValid(profileId)) {
-        throw new TypeError("profileId inválido.");
-      }
+    return {
+        /**
+         * Altera o display name se a versão observada ainda for atual.
+         */
+        async updateDisplayName({ profileId, expectedVersion, displayName }) {
+            if (!ObjectId.isValid(profileId)) {
+                throw new TypeError("profileId inválido.");
+            }
 
-      const normalizedName = displayName.trim();
+            const normalizedName = displayName.trim();
 
-      if (normalizedName.length < 2 || normalizedName.length > 80) {
-        throw new RangeError("displayName deve ter entre 2 e 80 caracteres.");
-      }
+            if (normalizedName.length < 2 || normalizedName.length > 80) {
+                throw new RangeError(
+                    "displayName deve ter entre 2 e 80 caracteres.",
+                );
+            }
 
-      return profiles.findOneAndUpdate(
-        {
-          _id: new ObjectId(profileId),
-          version: expectedVersion
+            return profiles.findOneAndUpdate(
+                {
+                    _id: new ObjectId(profileId),
+                    version: expectedVersion,
+                },
+                {
+                    $set: {
+                        displayName: normalizedName,
+                        updatedAt: new Date(),
+                    },
+                    $inc: { version: 1 },
+                },
+                {
+                    returnDocument: "after",
+                    projection: {
+                        _id: 1,
+                        displayName: 1,
+                        version: 1,
+                        updatedAt: 1,
+                    },
+                },
+            );
         },
-        {
-          $set: {
-            displayName: normalizedName,
-            updatedAt: new Date()
-          },
-          $inc: { version: 1 }
-        },
-        {
-          returnDocument: "after",
-          projection: { _id: 1, displayName: 1, version: 1, updatedAt: 1 }
-        }
-      );
-    }
-  };
+    };
 }
-~~~
+```
 
 Resultado: perfil atualizado ou `null` quando id/versão não corresponde; não existe janela entre update e read.
 
 ### Exemplo 2 — paginação e cursor com cleanup
 
-~~~javascript
+```javascript
 /**
  * @file Exporta filmes progressivamente sem os carregar todos.
  */
@@ -195,32 +198,32 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const movies = client.db("sample_mflix").collection("movies");
-  const cursor = movies
-    .find(
-      { year: { $gte: 1990, $lt: 2000 } },
-      { batchSize: 100, maxTimeMS: 10_000 }
-    )
-    .project({ _id: 0, title: 1, year: 1 })
-    .sort({ year: 1, title: 1 });
+    const movies = client.db("sample_mflix").collection("movies");
+    const cursor = movies
+        .find(
+            { year: { $gte: 1990, $lt: 2000 } },
+            { batchSize: 100, maxTimeMS: 10_000 },
+        )
+        .project({ _id: 0, title: 1, year: 1 })
+        .sort({ year: 1, title: 1 });
 
-  try {
-    for await (const movie of cursor) {
-      process.stdout.write(JSON.stringify(movie) + "\n");
+    try {
+        for await (const movie of cursor) {
+            process.stdout.write(JSON.stringify(movie) + "\n");
+        }
+    } finally {
+        await cursor.close();
     }
-  } finally {
-    await cursor.close();
-  }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: JSON Lines por filme; memória limitada pelo batch e processamento.
 
 ### Exemplo 3 — bulkWrite heterogéneo
 
-~~~javascript
+```javascript
 /**
  * @file Sincroniza produtos por SKU numa única chamada bulk.
  */
@@ -229,58 +232,58 @@ import { Decimal128, MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const products = client.db("shop").collection("products");
-  await products.createIndex({ sku: 1 }, { unique: true });
+    const products = client.db("shop").collection("products");
+    await products.createIndex({ sku: 1 }, { unique: true });
 
-  const operations = [
-    {
-      updateOne: {
-        filter: { sku: "BOOK-001" },
-        update: {
-          $set: {
-            name: "MongoDB Study Guide",
-            price: Decimal128.fromString("39.90"),
-            active: true,
-            updatedAt: new Date()
-          },
-          $setOnInsert: { createdAt: new Date() }
+    const operations = [
+        {
+            updateOne: {
+                filter: { sku: "BOOK-001" },
+                update: {
+                    $set: {
+                        name: "MongoDB Study Guide",
+                        price: Decimal128.fromString("39.90"),
+                        active: true,
+                        updatedAt: new Date(),
+                    },
+                    $setOnInsert: { createdAt: new Date() },
+                },
+                upsert: true,
+            },
         },
-        upsert: true
-      }
-    },
-    {
-      updateOne: {
-        filter: { sku: "BOOK-002" },
-        update: {
-          $set: { active: false, updatedAt: new Date() }
-        }
-      }
-    },
-    {
-      deleteOne: {
-        filter: { sku: "TEMP-REMOVED", temporary: true }
-      }
-    }
-  ];
+        {
+            updateOne: {
+                filter: { sku: "BOOK-002" },
+                update: {
+                    $set: { active: false, updatedAt: new Date() },
+                },
+            },
+        },
+        {
+            deleteOne: {
+                filter: { sku: "TEMP-REMOVED", temporary: true },
+            },
+        },
+    ];
 
-  const result = await products.bulkWrite(operations, { ordered: false });
-  console.log({
-    inserted: result.insertedCount,
-    matched: result.matchedCount,
-    modified: result.modifiedCount,
-    deleted: result.deletedCount,
-    upserted: result.upsertedCount
-  });
+    const result = await products.bulkWrite(operations, { ordered: false });
+    console.log({
+        inserted: result.insertedCount,
+        matched: result.matchedCount,
+        modified: result.modifiedCount,
+        deleted: result.deletedCount,
+        upserted: result.upsertedCount,
+    });
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: contadores agregados das operações executadas; não há all-or-nothing global.
 
 ### Exemplo 4 — tratar duplicate key sem esconder outras falhas
 
-~~~javascript
+```javascript
 /**
  * @file Cria conta e converte apenas duplicate key num conflito de domínio.
  */
@@ -289,29 +292,29 @@ import { MongoClient, MongoServerError } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 try {
-  const accounts = client.db("app").collection("accounts");
-  await accounts.createIndex({ email: 1 }, { unique: true });
+    const accounts = client.db("app").collection("accounts");
+    await accounts.createIndex({ email: 1 }, { unique: true });
 
-  try {
-    const result = await accounts.insertOne({
-      email: "ana@example.com",
-      status: "active",
-      createdAt: new Date()
-    });
+    try {
+        const result = await accounts.insertOne({
+            email: "ana@example.com",
+            status: "active",
+            createdAt: new Date(),
+        });
 
-    console.log(result.insertedId);
-  } catch (error) {
-    if (error instanceof MongoServerError && error.code === 11000) {
-      console.error("Já existe uma conta com esse email.");
-      process.exitCode = 2;
-    } else {
-      throw error;
+        console.log(result.insertedId);
+    } catch (error) {
+        if (error instanceof MongoServerError && error.code === 11000) {
+            console.error("Já existe uma conta com esse email.");
+            process.exitCode = 2;
+        } else {
+            throw error;
+        }
     }
-  }
 } finally {
-  await client.close();
+    await client.close();
 }
-~~~
+```
 
 Resultado: duplicate key é tratado como conflito; rede e outros erros continuam a propagar.
 
@@ -434,20 +437,20 @@ Fontes oficiais: [CRUD do driver](https://www.mongodb.com/docs/drivers/node/curr
 >
 > A API escolhida define o objeto que o código pode interpretar.
 
-| Operação | Retorno principal | Propriedade/consumo |
-|---|---|---|
-| `insertOne()` | `InsertOneResult` | `insertedId` |
-| `updateOne()` | `UpdateResult` | `matchedCount`/`modifiedCount` |
-| `deleteOne()` | `DeleteResult` | `deletedCount` |
-| `findOneAndUpdate()` | documento/`null` | fields do documento |
-| `find()` | `FindCursor` | iterar/`next()`/`toArray()` |
-| `bulkWrite()` | `BulkWriteResult` | contadores + erros parciais |
+| Operação             | Retorno principal | Propriedade/consumo            |
+| -------------------- | ----------------- | ------------------------------ |
+| `insertOne()`        | `InsertOneResult` | `insertedId`                   |
+| `updateOne()`        | `UpdateResult`    | `matchedCount`/`modifiedCount` |
+| `deleteOne()`        | `DeleteResult`    | `deletedCount`                 |
+| `findOneAndUpdate()` | documento/`null`  | fields do documento            |
+| `find()`             | `FindCursor`      | iterar/`next()`/`toArray()`    |
+| `bulkWrite()`        | `BulkWriteResult` | contadores + erros parciais    |
 
 > **Ligação entre capítulos:** métodos CRUD detalhados nos capítulos 05–07; pool no 04; índices no 09; transações no 12.
 
 ### Mapa mental do repository
 
-~~~text
+```text
 HTTP input
    |
    v
@@ -462,7 +465,7 @@ repository recebe Collection partilhada
             |
             v
 resposta de domínio sem expor dados internos
-~~~
+```
 
 ### Mini desafio
 
