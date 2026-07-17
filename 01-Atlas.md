@@ -17,6 +17,20 @@ MongoDB Atlas é o serviço gerido que provisiona e opera deployments MongoDB. O
 - O control plane configura organizações, projetos, utilizadores Atlas, billing, deployments, alertas e políticas.
 - O data plane contém bases de dados, collections, documentos e database users que autenticam ligações.
 
+O percurso da primeira operação ajuda a não misturar estes planos:
+
+```text
+Atlas user entra no portal
+    -> cria/configura um project e um database deployment
+    -> cria um database user
+    -> autoriza a origem de rede da aplicação
+    -> copia a connection string
+    -> a aplicação autentica-se como database user
+    -> executa comandos sobre databases e collections do data plane
+```
+
+O Atlas user participa na configuração. Não é enviado pelo Node.js Driver como identidade da aplicação. Depois da ligação, `sample_mflix` é uma database normal do deployment e `movies` uma collection; a aplicação não consulta “o projeto Atlas” através de `find()`.
+
 ### Hierarquia
 
 | Nível               | Responsabilidade                                                               |
@@ -60,7 +74,7 @@ Adicionar `0.0.0.0/0` permite ligações de qualquer origem IPv4 e deve ser apen
 | Replica set     | disponibilidade e redundância    | cópias do mesmo conjunto de dados |
 | Sharded cluster | escala horizontal e distribuição | partições por shard key           |
 
-Um shard é tipicamente ele próprio um replica set. Replicação não divide o dataset; sharding não substitui redundância. Reads secundárias podem aliviar certos workloads, mas trazem semântica de consistência e não aumentam a capacidade de escrita do primary de um replica set.
+Um shard é tipicamente ele próprio um replica set. Replicação não divide o dataset; sharding não substitui redundância. Reads secundárias podem aliviar certos workloads, mas trazem semântica de consistência e não aumentam a capacidade de escrita do primary de um replica set. A arquitetura, as shard keys e o routing são desenvolvidos no capítulo 10.
 
 ### Sample datasets
 
@@ -116,7 +130,17 @@ show collections
 db.movies.findOne({}, { title: 1, year: 1 })
 ```
 
-`use` altera a database ativa no shell; não cria a database até existir uma escrita. `show` e `use` são helpers de `mongosh`, não métodos do Node.js Driver.
+Leitura da sessão:
+
+- `show dbs` pede ao shell uma lista de databases visíveis ao utilizador;
+- `use sample_mflix` altera o handle `db` ativo, mas não cria a database até existir uma escrita;
+- `show collections` lista collections da database ativa;
+- `db.movies` seleciona a collection `movies` através do handle ativo;
+- `{}` é um filtro vazio, logo não restringe matches;
+- `{ title: 1, year: 1 }` é a projection; `_id` continua incluído por defeito;
+- `findOne()` devolve um documento ou `null`, não um cursor.
+
+`show` e `use` são helpers de `mongosh`, não métodos do Node.js Driver.
 
 ---
 
@@ -298,7 +322,7 @@ Num sharded cluster, queries targeted escalam melhor do que scatter-gather. A sh
 
 Atlas gere MongoDB na cloud, mas a aplicação continua a ligar-se com uma identidade de base de dados e uma origem de rede permitida. A hierarquia organization → project → deployment separa governação. Replica sets oferecem redundância; sharding distribui dados. SRV simplifica descoberta. Segurança exige secrets externos, roles mínimas e rede limitada. Performance depende de região, tier, working set, schema, índices e targeting.
 
-Fontes oficiais: [Get Started with Atlas](https://www.mongodb.com/docs/atlas/getting-started/), [configurar acesso](https://www.mongodb.com/docs/atlas/security/quick-start/), [connection strings](https://www.mongodb.com/docs/manual/reference/connection-string/), [sample datasets](https://www.mongodb.com/docs/atlas/sample-data/) e [replication](https://www.mongodb.com/docs/manual/replication/).
+Fontes oficiais: [Get Started with Atlas](https://www.mongodb.com/docs/atlas/getting-started/), [configurar acesso](https://www.mongodb.com/docs/atlas/security/quick-start/), [connection strings](https://www.mongodb.com/docs/manual/reference/connection-string/), [sample datasets](https://www.mongodb.com/docs/atlas/sample-data/), [replication](https://www.mongodb.com/docs/manual/replication/) e [sharding](https://www.mongodb.com/docs/manual/sharding/).
 
 ---
 
@@ -328,7 +352,7 @@ Fontes oficiais: [Get Started with Atlas](https://www.mongodb.com/docs/atlas/get
 | Replica set     | redundância/alta disponibilidade | distribuição horizontal do dataset |
 | Sharded cluster | distribuição do dataset          | backup histórico                   |
 
-> **Ligação entre capítulos:** connection strings e `authSource` aparecem no capítulo 03; `MongoClient` e TLS no capítulo 04; índices e targeting no capítulo 09.
+> **Ligação entre capítulos:** connection strings e `authSource` aparecem no capítulo 03; `MongoClient` e TLS no 04; índices no 09; sharded clusters, shard keys e targeting no 10.
 
 ### Fluxo de diagnóstico Atlas
 

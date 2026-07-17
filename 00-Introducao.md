@@ -30,13 +30,16 @@ Este capítulo apresenta termos que serão aprofundados mais tarde. Para que nã
 | Cursor        | objeto que permite consumir zero ou mais resultados progressivamente                                      |
 | Result object | objeto com metadata e contadores de uma escrita; não é o documento alterado                              |
 | Index         | estrutura auxiliar que organiza keys para reduzir o trabalho de determinadas queries                    |
+| Sharding      | distribui horizontalmente os documentos de uma collection por vários shards                           |
 | Transaction   | coordenação all-or-nothing de várias operações quando a atomicidade de um documento não é suficiente       |
 
-O percurso lógico do manual é: **dados → ligação → operações → resultados → índices → aggregation → transações → Search**. Estas definições são deliberadamente breves; cada capítulo especializado explica a semântica, as limitações e os custos.
+O percurso lógico do manual é: **dados → ligação → operações → resultados → índices → sharding → aggregation → transações → Search**. Estas definições são deliberadamente breves; cada capítulo especializado explica a semântica, as limitações e os custos.
 
 ### Âmbito do percurso
 
-O percurso oficial cobre Atlas, modelo documental, connection strings, `mongosh`, ligação a partir de Node.js, CRUD, índices e aggregation. Inclui ainda transações e MongoDB Search como unidades eletivas. Estes apontamentos tratam as eletivas como matéria relevante porque fazem parte da estrutura solicitada e exercitam decisões arquiteturais importantes.
+O percurso oficial cobre Atlas, modelo documental, connection strings, `mongosh`, ligação a partir de Node.js, CRUD, índices e aggregation. Inclui ainda transações e MongoDB Search como unidades eletivas. Estes apontamentos tratam as eletivas como matéria relevante porque exercitam decisões arquiteturais importantes.
+
+O capítulo 10 acrescenta sharding como unidade complementar. O Learning Path Node.js atual não o apresenta como curso autónomo, mas o tema é necessário para compreender escalabilidade horizontal, topologias Atlas, shard keys, routing e o custo de transações distribuídas. A profundidade administrativa é separada do conhecimento que um developer deve aplicar ao desenho de dados e queries.
 
 O exame Associate Developer Node.js é apresentado pela MongoDB University como uma prova de escolha múltipla, em inglês, com 53 perguntas e 75 minutos. Isto dá aproximadamente 85 segundos por pergunta. O objetivo não é decorar comandos raros: é reconhecer rapidamente a semântica correta de uma operação, o resultado provável e a opção adequada para o caso descrito.
 
@@ -106,6 +109,16 @@ Cada write sobre um único documento é atómico, mesmo que altere vários campo
 
 ### Projeto mínimo
 
+Este primeiro projeto separa três camadas que aparecem juntas nos exemplos seguintes:
+
+```text
+package.json  -> declara runtime, modo de módulos e driver
+MONGODB_URI   -> fornece configuração/credenciais fora do código
+ficheiro .js  -> cria o client, testa a ligação e liberta recursos
+```
+
+O objetivo não é ainda estudar todas as options. É perceber de onde vem cada elemento antes de executar uma operação.
+
 ```json
 {
     "name": "mongodb-certification-study",
@@ -119,6 +132,18 @@ Cada write sobre um único documento é atómico, mesmo que altere vários campo
     }
 }
 ```
+
+Anatomia do `package.json`:
+
+| Campo                  | Efeito                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| `name`                 | identifica o package local                                                              |
+| `private: true`        | reduz o risco de publicação acidental no npm                                            |
+| `type: "module"`       | faz Node.js interpretar `.js` com ES Modules e permite `import`                         |
+| `engines.node`         | documenta a versão mínima esperada; não instala Node.js                                 |
+| `dependencies.mongodb` | instala o MongoDB Node.js Driver; não instala nem cria um MongoDB Server                 |
+
+O prefixo `^` permite atualizações compatíveis segundo Semantic Versioning dentro da major 7. Para um laboratório reprodutível, o `package-lock.json` resultante deve ser preservado.
 
 Instalação:
 
@@ -160,7 +185,20 @@ try {
 }
 ```
 
-`MongoClient(uri, options)` recebe a connection string e opções do cliente. `serverApi` opta pela Stable API v1; não é a versão do MongoDB Server nem do driver. `connect()` força o estabelecimento inicial e `command({ ping: 1 })` confirma uma round trip autorizada.
+Leitura mínima do programa:
+
+1. `import` obtém classes exportadas pelo package `mongodb`.
+2. `process.env.MONGODB_URI` lê a configuração do ambiente; pode resultar em `undefined`.
+3. O `if` impede construir o client sem configuração válida.
+4. `new MongoClient(uri, options)` cria o objeto que vai gerir topologia e pools; ainda não executa uma query.
+5. `appName` acrescenta identidade observável às operações.
+6. `serverApi.version` opta pela Stable API v1; não é a versão do MongoDB Server nem do driver.
+7. `strict` pede erro para comandos fora da API declarada e `deprecationErrors` sinaliza funcionalidades descontinuadas nessa API.
+8. `connect()` força o estabelecimento inicial em vez de esperar pela primeira operação.
+9. `command({ ping: 1 })` envia um comando real à database `admin` e confirma uma round trip autorizada.
+10. `finally` executa `close()` tanto após sucesso como após erro.
+
+O retorno de `connect()` não é uma database ou collection. Esses handles são obtidos depois com `client.db(name)` e `database.collection(name)`.
 
 ---
 
@@ -326,7 +364,7 @@ Fontes oficiais: [Learning Path](https://learn.mongodb.com/learning-paths/mongod
 | `mongosh`      | shell interativo                  | Node.js Driver    |
 | Node.js Driver | API, BSON, discovery e pools      | ORM/ODM           |
 
-> **Ligação entre capítulos:** os tipos de retorno são aprofundados nos capítulos 05–08; atomicidade e transações no capítulo 12; índices no capítulo 09.
+> **Ligação entre capítulos:** os tipos de retorno são aprofundados nos capítulos 05–08; índices no 09; sharding no 10; atomicidade e transações no 13.
 
 ### Mapa mental
 

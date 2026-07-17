@@ -12,6 +12,32 @@
 
 ## Conceitos Fundamentais
 
+### O que muda ao sair de `mongosh` e entrar em Node.js?
+
+A semântica dos stages não muda. `$match`, `$group` e `$lookup` continuam a ser executados pelo servidor. O que Node.js acrescenta são responsabilidades de aplicação:
+
+- receber e validar parâmetros;
+- construir objetos JavaScript que serão serializados para BSON;
+- preservar tipos como `ObjectId`, `Date` e `Decimal128`;
+- escolher como consumir o cursor sem exceder memória;
+- fechar recursos e traduzir erros;
+- testar a pipeline como estrutura de dados.
+
+O fluxo completo é:
+
+```text
+parâmetros validados
+    -> builder cria um novo array de stages
+    -> collection.aggregate() envia a descrição ao servidor
+    -> servidor executa e devolve batches
+    -> AggregationCursor entrega documentos à aplicação
+    -> aplicação materializa, itera ou fecha o cursor
+```
+
+Portanto, a pipeline não “corre em JavaScript”. O driver serializa a descrição; os operadores são interpretados no servidor.
+
+### Cursor antes de array
+
 No driver, uma pipeline é um array de plain objects e `collection.aggregate(pipeline, options)` devolve um `AggregationCursor`. A chamada não devolve imediatamente o array final.
 
 ```javascript
@@ -31,6 +57,13 @@ for await (const document of cursor) {
     // processar um documento de cada vez
 }
 ```
+
+As duas formas têm contratos diferentes:
+
+- `toArray()` pede todos os resultados restantes e acumula-os num array em memória;
+- `for await...of` consome progressivamente os batches e permite processar um documento de cada vez;
+- ambas consomem o cursor; não se deve chamar `toArray()` depois de uma iteração parcial esperando novamente o resultado completo;
+- `batchSize` altera a forma de transporte, não transforma automaticamente `toArray()` numa operação de memória constante.
 
 ### aggregate versus find no driver
 
@@ -92,6 +125,14 @@ Explain mostra o plano dos stages que usam o query engine e estatísticas quando
 
 ### API principal
 
+A assinatura conceptual é:
+
+```javascript
+const cursor = collection.aggregate(pipeline, options);
+```
+
+Ao contrário de uma função JavaScript `async` que calcula localmente um array, `aggregate()` cria um cursor configurado. Não se escreve `await collection.aggregate(...)` para obter os documentos; escreve-se `await cursor.toArray()` ou itera-se o cursor.
+
 ```javascript
 const cursor = collection.aggregate(pipeline, {
     allowDiskUse: true,
@@ -102,12 +143,18 @@ const cursor = collection.aggregate(pipeline, {
 });
 ```
 
-- `pipeline`: array ordered de stages.
-- `allowDiskUse`: permite spill para stages elegíveis.
-- `batchSize`: documentos por batch, aproximadamente; não limita total.
-- `maxTimeMS`: limite server-side da operação.
-- `comment`: metadata de diagnóstico.
-- `hint`: sugere/força índice elegível para o início; validar o ciclo de vida.
+Anatomia dos argumentos:
+
+| Parte          | Tipo/forma                         | Responsabilidade                                                                  |
+| -------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| `pipeline`     | array ordenado de stage documents  | descreve transformação e ordem semântica                                          |
+| `allowDiskUse` | boolean                            | permite spill para stages elegíveis                                               |
+| `batchSize`    | integer positivo                   | solicita aproximadamente quantos resultados viajam por batch                      |
+| `maxTimeMS`    | integer em milissegundos           | limita execução server-side                                                       |
+| `comment`      | valor BSON                         | identifica a operação em diagnóstico                                              |
+| `hint`         | nome ou key pattern                | força/sugere índice elegível para a parte inicial da pipeline                      |
+
+`batchSize: 100` não limita o output a 100 documentos; para isso é necessário um stage `{ $limit: 100 }`. `maxTimeMS` não inclui necessariamente todo o tempo que um pedido passa à espera de uma ligação no pool ou de server selection. `hint` deve corresponder a um índice existente e adequado.
 
 ### Builder puro
 
@@ -139,7 +186,17 @@ function buildRevenuePipeline({ start, end, minimumRevenue }) {
 }
 ```
 
-O primeiro `$match` pode usar o índice da collection. O segundo filtra um campo calculado e não pode ser movido antes do `$group`.
+O builder recebe valores, não uma pipeline arbitrária enviada pelo cliente. Cada propriedade tem uma função:
+
+- `start` e `end` devem ser `Date` válidos e definem um intervalo semiaberto `[start, end)`;
+- `minimumRevenue` deve ser um número/decimal validado e só é usado depois de `revenue` existir;
+- o primeiro `$match` pode usar o índice da collection porque opera sobre `saleDate` armazenado;
+- `$unwind` muda uma venda com vários items para vários documentos lógicos;
+- `$group` volta a reduzir cardinalidade e calcula `revenue` por loja;
+- o segundo `$match` filtra um field calculado e não pode ser movido antes do `$group`;
+- `$sort` inclui `_id: 1` como desempate determinístico.
+
+A função devolve um novo array em cada chamada. Isso evita que stages condicionais de um request fiquem presos num array partilhado e contaminem o request seguinte.
 
 ---
 
@@ -493,7 +550,7 @@ Fontes oficiais: [aggregation no driver](https://www.mongodb.com/docs/drivers/no
 | `for await...of` | progressiva por batches      | muitos resultados               |
 | stream           | backpressure de Node streams | integração com pipelines stream |
 
-> **Ligação entre capítulos:** semântica dos stages está no capítulo 10; cursor e client partilhado nos capítulos 04 e 08; tipos BSON no 02.
+> **Ligação entre capítulos:** semântica dos stages está no capítulo 11; routing e execução distribuída no 10; cursor e client partilhado nos capítulos 04 e 08; tipos BSON no 02.
 
 ### Fluxo seguro de construção
 

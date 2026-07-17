@@ -12,15 +12,55 @@
 
 ## Conceitos Fundamentais
 
-Uma aggregation pipeline é um array ordenado de stages. Cada stage recebe um stream/conjunto de documentos e emite documentos para o seguinte. A ordem altera semântica e custo.
+### O problema que uma pipeline resolve
+
+`find()` é excelente quando o resultado continua a ser, essencialmente, um conjunto de documentos armazenados: filtrar, escolher fields, ordenar e limitar. Contudo, imagine que a aplicação não quer as encomendas; quer responder:
+
+> Qual foi a receita total por país apenas para encomendas pagas?
+
+Os documentos de origem podem ser:
+
+```javascript
+const orders = [
+    { _id: 1, status: "paid", country: "PT", total: 40 },
+    { _id: 2, status: "pending", country: "PT", total: 15 },
+    { _id: 3, status: "paid", country: "PT", total: 25 },
+    { _id: 4, status: "paid", country: "ES", total: 30 },
+];
+```
+
+O output pretendido já não tem a forma de uma encomenda:
 
 ```javascript
 [
+    { _id: "PT", revenue: 65 },
+    { _id: "ES", revenue: 30 },
+]
+```
+
+É necessário executar várias transformações em sequência: remover encomendas não pagas, criar um grupo para cada país, somar os totais e ordenar os novos documentos. É esse encadeamento que o Aggregation Framework representa.
+
+### A pipeline como linha de transformação
+
+Uma **aggregation pipeline** é um array ordenado de **stages**. Cada stage recebe os documentos emitidos pelo anterior e produz documentos para o seguinte. O output de um stage torna-se o input do próximo.
+
+```javascript
+const pipeline = [
     { $match: { status: "paid" } },
     { $group: { _id: "$country", revenue: { $sum: "$total" } } },
     { $sort: { revenue: -1 } },
 ];
 ```
+
+Leitura progressiva:
+
+1. `$match` recebe as quatro encomendas e deixa passar apenas três com `status: "paid"`.
+2. `$group` deixa de emitir encomendas individuais. Cria um documento por valor de `country`.
+3. `_id: "$country"` diz que o valor do field `country` é a chave de agrupamento; o prefixo `$` significa “ler o valor deste field”.
+4. `revenue: { $sum: "$total" }` cria no documento do grupo um field calculado com a soma dos valores `total`.
+5. `$sort` recebe os documentos agrupados e ordena-os por `revenue` descendente.
+
+A ordem é semântica. Se `$group` vier antes de `$match`, os documentos individuais deixam de ter `status` na forma original e a pergunta já não é equivalente. Uma pipeline não é uma lista de cláusulas que MongoDB pode interpretar em qualquer ordem.
 
 ### Stage versus expression versus accumulator
 
@@ -30,7 +70,14 @@ Uma aggregation pipeline é um array ordenado de stages. Cada stage recebe um st
 | expression  | `$add`, `$multiply` | calcula um valor dentro de stage                |
 | accumulator | `$sum`, `$avg`      | agrega valores no `$group`/contextos suportados |
 
-`$match` usa query predicate syntax. `$project`/`$set` usam aggregation expressions. Confundir contextos é uma fonte frequente de respostas erradas.
+No exemplo anterior:
+
+- `{ $match: ... }` é um stage completo porque ocupa um elemento do array da pipeline;
+- `"$country"` é uma field-path expression que obtém um valor de cada documento;
+- `{ $sum: "$total" }` é um accumulator dentro do `$group`;
+- `{ $sum: ... }` não pode ser colocado sozinho como elemento da pipeline.
+
+`$match` usa query predicate syntax. `$project`/`$set` usam aggregation expressions. O símbolo `$` aparece nos três contextos, mas isso não torna as formas intercambiáveis.
 
 ### Stages essenciais
 
@@ -105,6 +152,17 @@ O slot-based execution engine pode executar stages elegíveis com menor CPU/mem�
 
 ### Pipeline
 
+Em `mongosh`, a assinatura conceptual é:
+
+```javascript
+const cursor = db.collection.aggregate(pipeline, options);
+```
+
+- `pipeline` é um array, mesmo que tenha apenas um stage;
+- cada elemento do array é normalmente um documento com um stage de topo;
+- `options` é um único documento opcional aplicado à execução completa;
+- o retorno é um cursor, porque a pipeline pode produzir zero, um ou muitos documentos.
+
 ```javascript
 const pipeline = [{ $match: { status: "paid" } }, { $limit: 10 }];
 
@@ -116,6 +174,16 @@ const options = {
 
 db.collection.aggregate(pipeline, options);
 ```
+
+As options do exemplo não são stages e, por isso, ficam fora do array:
+
+| Option         | O que controla                                                                  |
+| -------------- | -------------------------------------------------------------------------------- |
+| `allowDiskUse` | permite spill para disco em stages elegíveis quando excedem o limite de memória  |
+| `maxTimeMS`    | tempo máximo de execução server-side antes de interrupção                        |
+| `comment`      | etiqueta de diagnóstico para logs/profiler                                      |
+
+`allowDiskUse: true` não elimina o limite BSON de 16 MiB do documento final nem o limite próprio de memória do `$facet`.
 
 ### Group
 
@@ -132,7 +200,18 @@ const groupStage = {
 };
 ```
 
-`$first` e `$last` dependem da ordem do stream; usar `$sort` quando a ordem é parte da regra.
+Anatomia de `$group`:
+
+- `$group` é o nome do stage;
+- `_id` é obrigatório e define a key de cada grupo; não é necessariamente o `_id` de origem;
+- `_id: "$groupKey"` lê `groupKey` de cada documento;
+- `_id: null` junta todos os documentos num único grupo;
+- cada outro field do output, como `count` ou `total`, recebe normalmente uma expressão accumulator;
+- `$sum: 1` soma a constante `1` por documento e, portanto, conta;
+- `$sum: "$amount"` soma valores provenientes do field `amount`;
+- `$addToSet` produz valores distintos, enquanto `$push` preservaria repetições.
+
+`$first` e `$last` dependem da ordem do stream; usar `$sort` antes do `$group` quando a ordem faz parte da regra. Os nomes `first` e `values` no snippet são fields de output escolhidos pela aplicação, não palavras reservadas.
 
 ### Lookup simples
 
@@ -147,7 +226,15 @@ const lookupStage = {
 };
 ```
 
-O output é sempre um array `product`. Para relação um-para-um lógica, pode seguir `$unwind`, decidindo `preserveNullAndEmptyArrays`.
+Leitura das propriedades:
+
+- `from` é o nome da foreign collection na mesma database;
+- `localField` é o path lido no documento que percorre a pipeline;
+- `foreignField` é o path comparado nos documentos de `from`;
+- `as` é o nome do novo field criado no output;
+- o novo field é sempre um array de matches, mesmo que a relação de negócio seja um-para-um.
+
+Para uma relação um-para-um lógica, pode seguir `$unwind`, decidindo explicitamente `preserveNullAndEmptyArrays`. `$lookup` não cria constraints referenciais e não garante que exista exatamente um produto.
 
 ### Lookup correlacionado
 
@@ -172,6 +259,15 @@ const correlatedLookupStage = {
     },
 };
 ```
+
+Nesta forma:
+
+- `let` publica valores do documento local como variáveis da subpipeline;
+- `orderedQuantity: "$ordered"` cria a variável `$$orderedQuantity`;
+- dentro da subpipeline, `$expr` permite usar aggregation expressions no `$match`;
+- `$stockItem` e `$inStock` são fields da foreign collection;
+- `$$itemSku` e `$$orderedQuantity` são as variáveis recebidas do documento local;
+- cada documento de origem pode, por isso, executar a mesma estrutura com valores correlacionados diferentes.
 
 `$expr` permite usar expressions no match e `$$variable` referencia variáveis de `let`.
 
@@ -442,7 +538,7 @@ Fontes oficiais: [aggregation](https://www.mongodb.com/docs/manual/aggregation/)
 | join/facet/window         | não            | sim                                |
 | retorno                   | `FindCursor`   | `AggregationCursor` no driver      |
 
-> **Ligação entre capítulos:** índices do capítulo 09 ajudam os stages iniciais; execução no driver está no capítulo 11; Search adiciona stages especializados no 13.
+> **Ligação entre capítulos:** índices do capítulo 09 ajudam os stages iniciais; sharding e distribuição estão no 10; execução no driver está no 12; Search adiciona stages especializados no 14.
 
 ### Mapa mental da pipeline
 

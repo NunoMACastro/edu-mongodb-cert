@@ -12,6 +12,32 @@
 
 ## Conceitos Fundamentais
 
+### O papel deste capítulo no percurso CRUD
+
+Os capítulos 05 a 07 explicaram operações isoladas. Este capítulo responde a uma pergunta diferente: **como é que essas operações vivem dentro de uma aplicação Node.js sem perder semântica, segurança e controlo de erros?**
+
+Uma operação de repository não deve começar em `collection.updateOne()`. O percurso completo é:
+
+```text
+input externo
+    -> validar tipo, formato, limites e autorização
+    -> construir filter/update/projection com fields permitidos
+    -> executar a operação através de uma Collection partilhada
+    -> interpretar documento, cursor ou result object
+    -> converter ausência/conflito/falha numa resposta da aplicação
+```
+
+Por exemplo, “alterar o nome do perfil” envolve decisões que não aparecem no snippet MongoDB isolado:
+
+- o id recebido é um `ObjectId` válido?
+- o utilizador pode alterar este perfil?
+- o nome respeita tamanho e normalização?
+- pretende-se um update parcial ou replacement?
+- é necessário detetar edição concorrente?
+- o retorno deve ser o documento final ou apenas contadores?
+
+Este contexto explica por que surgem repositories, validação, optimistic concurrency e tratamento de erros. Não são novas operações CRUD: são a camada de aplicação que usa corretamente as operações já estudadas.
+
 ### Mapeamento das APIs
 
 | Intenção                   | Método             | Resultado                    |
@@ -85,6 +111,22 @@ Não basear lógica só em texto da mensagem. Usar classes/codes documentados e 
 
 ### findOneAndUpdate atual
 
+A assinatura conceptual é:
+
+```javascript
+const documentOrNull = await collection.findOneAndUpdate(
+    filter,
+    update,
+    options,
+);
+```
+
+- `filter` escolhe o documento no estado existente no servidor;
+- `update` descreve a alteração através de operadores ou de uma update pipeline;
+- `options` controla retorno, projection, upsert, sort, session e outras condições de execução;
+- a operação de localizar e alterar um documento é atómica sobre esse documento;
+- no driver atual, o retorno normal é o documento selecionado ou `null`.
+
 ```javascript
 const updatedDocument = await collection.findOneAndUpdate(filter, update, {
     returnDocument: "after",
@@ -94,9 +136,20 @@ const updatedDocument = await collection.findOneAndUpdate(filter, update, {
 });
 ```
 
-`updatedDocument` é documento ou `null`. Com `includeResultMetadata: true`, o documento fica em `result.value`.
+As options do exemplo significam:
+
+| Option                  | Valor do exemplo       | Consequência                                                                        |
+| ----------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| `returnDocument`        | `"after"`              | devolve a versão posterior ao update; `"before"` devolve a anterior                 |
+| `projection`            | `{ sensitiveField: 0 }`| impede que esse field seja incluído no documento devolvido                          |
+| `upsert`                | `false`                | se não existir match, devolve `null` e não insere                                   |
+| `includeResultMetadata` | `false`                | devolve diretamente documento/`null`, sem wrapper `ModifyResult`                    |
+
+Com `includeResultMetadata: true`, o retorno muda de forma: passa a existir um `ModifyResult` e o documento fica em `result.value`. A option não adiciona apenas “mais um field” ao documento; muda o contrato da API.
 
 ### bulkWrite
+
+`bulkWrite()` recebe um array de **write models**. Cada elemento possui exatamente uma operação de topo, e o valor dessa propriedade contém os argumentos que seriam usados pela operação individual.
 
 ```javascript
 const result = await collection.bulkWrite(
@@ -110,6 +163,19 @@ const result = await collection.bulkWrite(
 );
 ```
 
+Leitura de cada model:
+
+| Model        | Campos internos essenciais                         | Operação equivalente aproximada               |
+| ------------ | -------------------------------------------------- | ---------------------------------------------- |
+| `insertOne`  | `document`                                         | `insertOne(document)`                          |
+| `updateOne`  | `filter`, `update`, `upsert?`, `arrayFilters?`      | `updateOne(filter, update, options)`           |
+| `deleteOne`  | `filter`, `hint?`                                  | `deleteOne(filter, options)`                   |
+| `replaceOne` | `filter`, `replacement`, `upsert?`                 | `replaceOne(filter, replacement, options)`     |
+
+`ordered: false` pertence às options do batch inteiro. Significa que, perante uma falha numa operação, o driver/servidor tenta continuar o trabalho independente possível. Não significa paralelismo garantido, atomicidade nem sucesso silencioso: um `MongoBulkWriteError` pode conter simultaneamente erros e contadores parciais.
+
+O retorno `BulkWriteResult` agrega campos como `insertedCount`, `matchedCount`, `modifiedCount`, `deletedCount`, `upsertedCount` e identificadores disponíveis. Não devolve os documentos finais de todos os models.
+
 ### Hint, timeout e comment
 
 ```javascript
@@ -121,7 +187,14 @@ const cursor = collection.find(filter, {
 });
 ```
 
-`hint` força um índice e pode falhar se não existir. Usar apenas quando existe evidência e gestão coordenada do ciclo de vida do índice.
+Aqui as três options resolvem problemas diferentes:
+
+- `projection` controla exposição e volume dos fields devolvidos;
+- `hint` obriga o planner a considerar o índice identificado pelo key pattern/nome e pode falhar se ele não existir;
+- `maxTimeMS` limita tempo de execução server-side, mas não substitui todos os timeouts de seleção, rede e pool;
+- `comment` acrescenta metadata pesquisável em diagnóstico/profiling, sem alterar o resultado.
+
+`hint` deve ser usado apenas com evidência e gestão coordenada do ciclo de vida do índice. Copiar um hint para “tornar a query rápida” pode bloquear um plano melhor ou fazer a aplicação falhar depois de uma migration de índices.
 
 ---
 

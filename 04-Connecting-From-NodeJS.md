@@ -129,6 +129,14 @@ O driver converte JavaScript para BSON. Tipos BSON sem equivalente seguro usam c
 
 ### Cliente de produção
 
+A assinatura conceptual do construtor é:
+
+```javascript
+const client = new MongoClient(uri, clientOptions);
+```
+
+`uri` define discovery, credenciais e opções de ligação codificadas na connection string. `clientOptions` permite configurar o driver em código. Se a mesma opção aparecer em ambos os locais, deve evitar-se depender de precedências implícitas: centralizar configuração reduz surpresas.
+
 ```javascript
 import { MongoClient, ServerApiVersion } from "mongodb";
 
@@ -150,6 +158,19 @@ const client = new MongoClient(process.env.MONGODB_URI, {
 });
 ```
 
+As options estão agrupadas por responsabilidade:
+
+| Grupo                    | Options do exemplo                                         | Pergunta a que respondem                                        |
+| ------------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| observabilidade          | `appName`                                                  | como identificar a aplicação em diagnóstico?                     |
+| capacidade do pool       | `maxPoolSize`, `minPoolSize`, `maxConnecting`              | quantas ligações manter/criar por servidor?                       |
+| espera/descoberta        | `waitQueueTimeoutMS`, `serverSelectionTimeoutMS`           | quanto esperar por checkout ou por servidor elegível?            |
+| abertura de socket       | `connectTimeoutMS`                                         | quanto esperar por uma tentativa de ligação de rede?              |
+| resiliência elegível     | `retryReads`, `retryWrites`                                | permitir retries transparentes nas operações suportadas?         |
+| compatibilidade servidor | `serverApi`                                                | que contrato de Stable API declarar?                              |
+
+`maxPoolSize: 50` é por pool/servidor, não “50 ligações para toda a organização Atlas”. `minPoolSize: 0` permite que o pool comece sem ligações ociosas. `maxConnecting: 2` limita criações concorrentes, não operações concorrentes totais.
+
 Os valores são exemplos, não defaults universais para qualquer workload. Devem derivar de SLO, concorrência, número de processos e capacidade do deployment.
 
 ### Selecionar database e collection
@@ -159,13 +180,15 @@ const database = client.db("sample_mflix");
 const movies = database.collection("movies");
 ```
 
-Isto cria handles. A primeira operação realiza I/O se ainda não houver ligação.
+`client.db(name)` devolve um handle `Db`; `database.collection(name)` devolve um handle `Collection`. Isto não cria um novo `MongoClient`, não reserva permanentemente uma ligação do pool e não garante que os namespaces já existem. A primeira operação realiza I/O se ainda não houver ligação.
 
 ### Encerrar
 
 ```javascript
 await client.close();
 ```
+
+`close()` encerra pools e recursos mantidos por **esse client**. Deve ser aguardado no shutdown para que o processo não abandone o encerramento a meio.
 
 No driver 7.4+, resource management com `await using` está estável em runtimes compatíveis, mas `try/finally` continua explícito e amplamente compreendido. Não misturar ciclos de vida: quem recebe um client partilhado não o deve fechar.
 
@@ -453,7 +476,7 @@ Fontes oficiais: [ligar com o Node.js Driver](https://www.mongodb.com/docs/drive
 | `socketTimeoutMS`          | I/O no socket               | comunicação sem progresso |
 | `maxTimeMS`                | execução no servidor        | comando excede prazo      |
 
-> **Ligação entre capítulos:** a URI e TLS vêm do capítulo 03; cursores e backpressure dos capítulos 07–08; sessions e transactions do capítulo 12.
+> **Ligação entre capítulos:** a URI e TLS vêm do capítulo 03; cursores e backpressure dos capítulos 07–08; sessions e transactions do capítulo 13.
 
 ### Fluxo de ciclo de vida
 

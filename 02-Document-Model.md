@@ -235,7 +235,13 @@ const order = {
 };
 ```
 
-O snapshot de nome e preço é duplicação intencional: uma encomenda histórica não deve mudar quando o catálogo muda.
+Este objeto mostra três níveis do modelo:
+
+- fields escalares no documento raiz, como `status` e `createdAt`;
+- um subdocumento embedded em `shippingAddress`;
+- um array de subdocumentos embedded em `items`.
+
+`new ObjectId(...)`, `Decimal128.fromString(...)` e `new Date()` não são decoração: preservam tipos BSON diferentes de strings. O snapshot de nome e preço é duplicação intencional: uma encomenda histórica não deve mudar quando o catálogo muda.
 
 ### Dot notation
 
@@ -257,6 +263,8 @@ const exampleFilters = [
 `$elemMatch` garante que as condições se aplicam ao mesmo elemento do array. Sem ele, condições em paths paralelos podem ser satisfeitas por elementos diferentes.
 
 ### Validator
+
+A assinatura usada aqui é `db.createCollection(name, options)`. O primeiro argumento escolhe o nome; o segundo configura a collection. `validator` é uma das options e `$jsonSchema` é a expressão de validação, não um schema TypeScript nem uma validação executada no cliente.
 
 ```javascript
 await db.createCollection("orders", {
@@ -289,7 +297,20 @@ await db.createCollection("orders", {
 });
 ```
 
-`validationLevel` determina que documentos são validados; `validationAction: "error"` rejeita, enquanto `"warn"` regista sem rejeitar.
+Leitura de fora para dentro:
+
+- `bsonType: "object"` exige que o valor raiz seja um documento;
+- `required` exige a presença dos fields listados, mas não define sozinho o tipo deles;
+- `properties` associa cada field às suas regras;
+- `enum` restringe `status` aos três valores indicados;
+- `items.bsonType: "array"` exige um array e `minItems: 1` impede o array vazio;
+- o `items` mais interior descreve **cada elemento** desse array;
+- `quantity` tem de ser BSON Int32 e pelo menos 1;
+- `unitPrice` tem de ser BSON Decimal128 e não negativo;
+- `validationLevel: "strict"` aplica validação a inserts e updates segundo a política strict;
+- `validationAction: "error"` rejeita violações, enquanto `"warn"` apenas as regista.
+
+O validator protege a database mesmo quando outro cliente não usa a validação da aplicação. Não substitui regras de autorização, relações entre collections nem todas as invariantes de negócio.
 
 ---
 

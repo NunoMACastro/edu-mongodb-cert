@@ -151,6 +151,15 @@ Igualdade a um scalar sobre um campo array corresponde se algum elemento for igu
 
 ### Insert
 
+As assinaturas conceptuais são:
+
+```javascript
+insertOne(document, options);
+insertMany(documents, options);
+```
+
+No singular, o primeiro argumento é um documento. No plural, é um array de documentos; passar um único objeto não significa “inserir os seus fields como documentos”.
+
 ```javascript
 const oneResult = await collection.insertOne(document, {
     writeConcern: { w: "majority" },
@@ -161,7 +170,14 @@ const manyResult = await collection.insertMany(documents, {
 });
 ```
 
+- `writeConcern: { w: "majority" }` pede acknowledgement depois de a maioria exigida dos membros data-bearing confirmar a escrita; não significa que uma maioria de utilizadores a validou;
+- `ordered: false` permite continuar inserts independentes depois de um erro e pode produzir sucesso parcial;
+- `oneResult` contém `insertedId`; `manyResult` contém `insertedCount` e `insertedIds` para as posições reconhecidas;
+- nenhum dos dois retornos é o documento lido de volta da collection.
+
 ### Find
+
+As duas APIs partilham `filter` e várias options, mas diferem na cardinalidade e no retorno:
 
 ```javascript
 const cursor = collection.find(filter, {
@@ -180,7 +196,17 @@ const document = await collection.findOne(filter, {
 });
 ```
 
-`sort` em `findOne()` escolhe que match devolver quando existem vários; não cria unicidade.
+| Parte        | Papel                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `filter`     | documento MQL que seleciona candidatos; `{}` aceita todos                                    |
+| `projection` | controla os fields devolvidos                                                                 |
+| `sort`       | ordena os matches antes de os consumir/escolher                                               |
+| `limit`      | limita o total do cursor de `find()`                                                          |
+| `maxTimeMS`  | limita o tempo server-side da operação                                                        |
+| `hint`       | força um índice por nome ou key pattern                                                       |
+| `collation`  | define regras linguísticas de comparação para strings                                         |
+
+`find()` devolve `FindCursor` sem materializar resultados. `findOne()` devolve uma Promise de documento/`null`. `sort` em `findOne()` escolhe que match devolver quando existem vários; não cria unicidade.
 
 ### Filtros frequentes
 
@@ -202,6 +228,16 @@ const exampleFilters = [
     },
 ];
 ```
+
+Cada elemento do array é uma alternativa de filtro, não uma query que aplica todas as linhas:
+
+- `{ year: 1999 }` é igualdade implícita;
+- `$gte` inclui o limite inferior e `$lt` exclui o superior;
+- `$in` aceita qualquer um dos valores listados;
+- `$or` exige pelo menos um branch verdadeiro;
+- `$all` exige que o array `cast` contenha ambos os valores;
+- dot notation percorre `awards.wins`;
+- `$elemMatch` exige `author` e `approved` no mesmo subdocumento de `comments`.
 
 ---
 

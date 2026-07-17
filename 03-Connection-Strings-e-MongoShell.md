@@ -94,11 +94,15 @@ O driver mantém uma visão da topologia. Para cada operação, filtra servidore
 mongodb://[username:password@]host1[:port1][,hostN[:portN]]/[defaultAuthDb][?options]
 ```
 
+Os parênteses retos nesta documentação significam “parte opcional”; não são caracteres que se copiam para a URI. `hostN` indica que podem existir vários seed hosts separados por vírgula. A `/` antes da database e o `?` antes das options são separadores estruturais.
+
 ### Formato SRV
 
 ```text
 mongodb+srv://[username:password@]host[/[defaultAuthDb][?options]]
 ```
+
+No formato SRV escreve-se um hostname de serviço e não uma lista de hosts/portas. O driver usa DNS para obter os seeds. A parte `defaultAuthDb` mantém o mesmo papel de database inicial; autenticar noutra database continua a exigir `authSource` quando aplicável.
 
 ### Opções frequentes
 
@@ -131,6 +135,19 @@ db.movies.findOne({ title: "The Matrix" })
 db.movies.countDocuments({ genres: "Drama" })
 db.movies.explain("executionStats").find({ title: "The Matrix" })
 ```
+
+Estas linhas não devolvem todas o mesmo tipo de resultado:
+
+| Expressão                                      | Resultado/efeito principal                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------- |
+| `db.getName()`                                 | string com o nome da database ativa                                             |
+| `db.getCollectionNames()`                      | array de nomes de collections                                                   |
+| `db.movies.find(filter).limit(5)`              | cursor configurado para no máximo cinco documentos                              |
+| `db.movies.findOne(filter)`                    | um documento ou `null`                                                          |
+| `db.movies.countDocuments(filter)`             | número exato de matches segundo a query                                         |
+| `db.movies.explain(...).find(filter)`          | documento de diagnóstico do plano, não os filmes                                |
+
+`db` é o handle da database ativa; `movies` é o nome da collection; os documentos dentro de `find()`/`findOne()` são filtros MQL. O shell pode imprimir automaticamente os primeiros resultados de um cursor, mas isso não transforma o cursor num array.
 
 ---
 

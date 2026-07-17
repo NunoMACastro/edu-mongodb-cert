@@ -12,6 +12,10 @@ Este relatório é o único ficheiro novo criado, por ser o artefacto final pedi
 
 > **Nota de estado — 16 de julho de 2026:** este relatório documenta a revisão técnica concluída antes do enriquecimento pedagógico para certificação. As contagens de secções, separadores, tabelas, palavras e blocos abaixo pertencem a esse snapshot. O estado posterior do manual, incluindo novas caixas, mapas, checklists e perguntas, está documentado em [`CERTIFICATION_ENHANCEMENT_REPORT.md`](./CERTIFICATION_ENHANCEMENT_REPORT.md). O conteúdo técnico validado foi preservado.
 
+> **Nota posterior — 17 de julho de 2026:** foi criado `10-Sharding.md` e os antigos capítulos 10–13 foram renumerados para 11–14. A tabela abaixo usa os nomes atuais para manter os links legíveis, mas as métricas 15/15 continuam a descrever o snapshot anterior à criação de sharding. A validação do conjunto atual de 16 capítulos está no relatório de enriquecimento.
+
+> **Nota de reconstrução pedagógica — 17 de julho de 2026:** depois deste snapshot técnico, os 16 capítulos receberam uma revisão estrutural integral. A afirmação histórica abaixo de que “os apontamentos não foram reescritos” já não descreve o estado pedagógico atual: conceitos e sintaxe foram reordenados e ampliados para construir primeiro o modelo mental. O âmbito e as métricas atuais estão em [`CERTIFICATION_ENHANCEMENT_REPORT.md`](./CERTIFICATION_ENHANCEMENT_REPORT.md).
+
 ## Resultado global
 
 O conjunto estava tecnicamente sólido e já usava APIs modernas. A revisão não encontrou exemplos ativos baseados em callbacks do driver, `collection.count()`, `cursor.count()`, `remove()`, `save()` ou `update()` legado. As referências a APIs antigas permanecem apenas quando servem para avisar que não devem ser usadas.
@@ -32,10 +36,10 @@ Foram corrigidas duas lacunas técnicas materiais, um problema de lifecycle num 
 | `07-CRUD-Sort-Limit-Projection.md` | sort, projection, paginação, batch e counts | reforço das regras de projection e de `limit()`/`batchSize()` |
 | `08-CRUD-NodeJS.md` | result objects, compound operations, bulk e erros | semântica atual de `includeResultMetadata` destacada |
 | `09-Indexes.md` | compound, ESR, multikey, coverage e `explain` | restrições multikey e uso de `$elemMatch` em index bounds reforçados |
-| `10-Aggregation.md` | stages, cardinalidade, blocking, otimização e memória | correção significativa dos limites próprios de `$facet` |
-| `11-Aggregation-NodeJS.md` | `AggregationCursor`, batches, BSON e builders | reforço de cursor, `toArray()` e iteração progressiva |
-| `12-Transactions.md` | sessions, retries, concerns, side effects e contenção | ausência de paralelismo e passagem da mesma session destacadas |
-| `13-Atlas-Search.md` | search indexes, mappings, analyzers, scoring e operadores | distinção de índices reforçada e links oficiais atualizados |
+| `11-Aggregation.md` | stages, cardinalidade, blocking, otimização e memória | correção significativa dos limites próprios de `$facet` |
+| `12-Aggregation-NodeJS.md` | `AggregationCursor`, batches, BSON e builders | reforço de cursor, `toArray()` e iteração progressiva |
+| `13-Transactions.md` | sessions, retries, concerns, side effects e contenção | ausência de paralelismo e passagem da mesma session destacadas |
+| `14-Atlas-Search.md` | search indexes, mappings, analyzers, scoring e operadores | distinção de índices reforçada e links oficiais atualizados |
 | `99-Resumo-Final.md` | coerência transversal, tabelas, checklist e revisão | nota sobre uso legítimo das prioridades de exame |
 
 ## Principais correções
@@ -134,7 +138,7 @@ Todos os capítulos mantêm a mesma sequência de secções:
 10. O que costuma aparecer no exame
 11. Resumo
 
-Foram preservados os títulos, separadores, tabelas, fences `~~~`, termos técnicos em inglês e estilo de português europeu. Cada ficheiro contém agora pelo menos uma nota com o mesmo formato.
+Foram preservados os títulos, separadores, tabelas, code fences, termos técnicos em inglês e estilo de português europeu. Cada ficheiro contém agora pelo menos uma nota com o mesmo formato.
 
 ## Validação executada
 
@@ -149,17 +153,19 @@ Foram preservados os títulos, separadores, tabelas, fences `~~~`, termos técni
 
 A validação de JavaScript foi sintática e a compatibilidade das APIs foi confrontada com documentação oficial. Os exemplos não foram executados contra um cluster real, porque isso exigiria credenciais, dados, índices e configuração de topologia externos. Resultados dependentes de `sample_mflix`, `sample_supplies`, transações ou MongoDB Search devem ser confirmados num deployment de laboratório antes de uma publicação executável.
 
+Na reconstrução pedagógica posterior, a validação sintática subiu para **142/142 blocos JavaScript**, os 16 capítulos mantiveram fences equilibradas e os 15 links internos foram resolvidos sem destinos em falta. Estes números pertencem ao estado atual e não alteram as métricas históricas acima.
+
 ## Capítulos com alterações significativas
 
 ### `04-Connecting-From-NodeJS.md`
 
 Alteração significativa por corrigir lifecycle concorrente no shutdown e completar o modelo de capacidade dos pools.
 
-### `10-Aggregation.md`
+### `11-Aggregation.md`
 
 Alteração significativa por documentar a exceção de memória de `$facet` e a relação correta com `allowDiskUse` e o limite BSON.
 
-### `13-Atlas-Search.md`
+### `14-Atlas-Search.md`
 
 Alteração moderada por atualizar o encaminhamento documental e tornar explícita a separação entre database indexes e search indexes.
 

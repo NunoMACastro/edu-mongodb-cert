@@ -3,14 +3,41 @@
 ## Objetivos do capítulo
 
 - Consolidar os capítulos numa revisão técnica única.
-- Consultar operadores, stages, tipos, índices e métodos em tabelas.
+- Consultar operadores, stages, tipos, índices, sharding e métodos em tabelas.
 - Comparar APIs frequentemente confundidas.
 - Rever decisões de performance, consistência e segurança.
-- Usar uma checklist e os 100 conceitos essenciais antes do exame.
+- Usar uma checklist e os 110 conceitos essenciais antes do exame.
 
 ---
 
 ## Conceitos Fundamentais
+
+### Como usar este resumo
+
+Este ficheiro é deliberadamente uma ferramenta de **recuperação e decisão**, não a primeira explicação da matéria. As tabelas seguintes condensam sintaxe e diferenças que já devem ter sido construídas nos capítulos pedagógicos. Se uma linha parecer surgir “do nada”, não deve ser memorizada isoladamente: deve regressar-se ao capítulo que explica o problema, o modelo mental, a anatomia da API e os exemplos progressivos.
+
+Percurso recomendado:
+
+1. estudar o capítulo completo e executar os exemplos;
+2. responder às perguntas desse capítulo sem consultar o texto;
+3. usar este resumo para ligar conceitos e localizar fraquezas;
+4. regressar ao capítulo sempre que não se conseguir explicar **porquê** uma opção está correta.
+
+| Se a dúvida é sobre...                       | Explicação de base                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| documentos, BSON, embedding e referências   | [02 — Modelo documental](02-Document-Model.md)                                     |
+| URI, autenticação e `mongosh`                | [03 — Connection strings e shell](03-Connection-Strings-e-MongoShell.md)           |
+| client, pool, timeouts e lifecycle           | [04 — Ligação a partir de Node.js](04-Connecting-From-NodeJS.md)                   |
+| inserts, reads e filtros                     | [05 — CRUD: insert e find](05-CRUD-Insert-Find.md)                                 |
+| updates, replacements e deletes              | [06 — CRUD: mutações](06-CRUD-Update-Replace-Delete.md)                            |
+| sort, projection, limit, count e paginação   | [07 — Resultados e paginação](07-CRUD-Sort-Limit-Projection.md)                    |
+| repositories, bulk e compound operations     | [08 — CRUD no Node.js Driver](08-CRUD-NodeJS.md)                                   |
+| key patterns, criação e desenho de índices   | [09 — Índices](09-Indexes.md)                                                      |
+| shard keys, routing e distribuição           | [10 — Sharding](10-Sharding.md)                                                    |
+| stages, expressions e accumulators           | [11 — Aggregation Framework](11-Aggregation.md)                                    |
+| cursor e builders de aggregation em Node.js  | [12 — Aggregation no Node.js Driver](12-Aggregation-NodeJS.md)                     |
+| sessions, callbacks e retries transacionais  | [13 — Transações](13-Transactions.md)                                              |
+| analyzers, search index, operadores e score  | [14 — MongoDB Search](14-Atlas-Search.md)                                          |
 
 ### Resumo de todos os capítulos
 
@@ -26,10 +53,11 @@
 | 07 — Result Modifiers    | ordenar/projetar/paginar                            | projection válida e sort determinístico   |
 | 08 — CRUD Node.js        | cada método tem retorno próprio                     | compound operations e bulk                |
 | 09 — Indexes             | menos read work por custo de write/storage          | prefixos, ESR, multikey e explain         |
-| 10 — Aggregation         | pipeline ordered de transformações                  | stages, expressions, accumulators         |
-| 11 — Aggregation Node.js | `aggregate()` devolve cursor                        | batch, BSON e construção segura           |
-| 12 — Transactions        | ACID multi-document quando necessário               | session, retries e callback repetível     |
-| 13 — Search              | índice invertido e relevância                       | mappings, analyzers e `compound`          |
+| 10 — Sharding            | distribuir dados e workload horizontalmente          | shard key, targeting e scatter-gather     |
+| 11 — Aggregation         | pipeline ordered de transformações                  | stages, expressions, accumulators         |
+| 12 — Aggregation Node.js | `aggregate()` devolve cursor                        | batch, BSON e construção segura           |
+| 13 — Transactions        | ACID multi-document quando necessário               | session, retries e callback repetível     |
+| 14 — Search              | índice invertido e relevância                       | mappings, analyzers e `compound`          |
 
 ### Modelo mental de uma operação
 
@@ -37,11 +65,12 @@
 2. **MQL:** construir filtro/stages com allowlist.
 3. **Driver:** escolher método e options; entender o retorno.
 4. **Topology/pool:** selecionar servidor e ligação.
-5. **Planner:** escolher `COLLSCAN`/índice/pipeline plan.
-6. **Storage:** ler/escrever BSON e atualizar índices.
-7. **Consistency:** aplicar concerns/session/transaction.
-8. **Output:** projetar, limitar, iterar e não expor dados.
-9. **Evidence:** verificar result object e `explain`.
+5. **Routing:** num sharded cluster, determinar os shards participantes.
+6. **Planner:** escolher `COLLSCAN`/índice/pipeline plan em cada executor.
+7. **Storage:** ler/escrever BSON e atualizar índices.
+8. **Consistency:** aplicar concerns/session/transaction.
+9. **Output:** projetar, limitar, iterar e não expor dados.
+10. **Evidence:** verificar result object, fan-out e `explain`.
 
 ### Diferenças entre métodos e conceitos frequentemente confundidos
 
@@ -63,6 +92,9 @@
 | projection         | schema                     | output da query vs forma persistida              |
 | embedding          | referencing                | coesão/atomicidade vs independência/partilha     |
 | replica set        | sharded cluster            | redundância vs distribuição                      |
+| shard key          | query index                | onde procurar vs como procurar localmente        |
+| targeted query     | scatter-gather             | shard(s) relevante(s) vs broadcast               |
+| primary shard      | replica set primary        | local de unsharded data vs membro que aceita write |
 | replication        | backup                     | disponibilidade atual vs recuperação histórica   |
 | Atlas user         | database user              | gestão Atlas vs autenticação ao server           |
 | default database   | `authSource`               | handle inicial vs origem de autenticação         |
@@ -92,13 +124,14 @@ Node.js object
   → server selection
   → pool checkout
   → command over TLS
+  → mongos routing quando a topologia é sharded
   → authz + query planning
   → index/storage execution
   → BSON response/batches
   → JavaScript values or cursor
 ```
 
-O `MongoClient` mantém discovery, monitoring e pools. Uma operação seleciona um servidor, obtém uma ligação e envia um comando. O server planner compara planos e pode reutilizar plan cache. Índices B-tree mantêm keys ordenadas; multikey produz keys para arrays. Cursors transferem batches e conservam estado até serem esgotados/fechados.
+O `MongoClient` mantém discovery, monitoring e pools. Uma operação seleciona um servidor, obtém uma ligação e envia um comando. Num sharded cluster, `mongos` usa a shard key e a metadata de ranges para escolher os shards participantes. Cada shard planeia localmente; resultados multi-shard podem exigir merge. Índices B-tree mantêm keys ordenadas; multikey produz keys para arrays. Cursors transferem batches e conservam estado até serem esgotados/fechados.
 
 Writes atualizam documento e índices. Cada write single-document é atómico. Uma transação cria uma snapshot/coordenação multi-documento; `withTransaction` pode repetir callback. Search usa um índice derivado/invertido e atribui relevância, com sincronização não necessariamente imediata.
 
@@ -253,6 +286,24 @@ Otimizar sem medir um destes eixos tende a trocar um problema por outro.
 | wildcard     | `{ "attrs.$**": 1 }`        | paths variáveis          |
 | clustered    | opção de collection         | ordem de armazenamento   |
 | Search       | search index definition     | full-text relevance      |
+
+### Tabela de sharding
+
+| Conceito | Decide/representa | Sinal principal |
+| -------- | ----------------- | --------------- |
+| replica set | redundância do mesmo dataset | high availability |
+| sharded cluster | distribuição horizontal | vários shards |
+| shard | parte dos dados sharded | normalmente um replica set |
+| `mongos` | routing e merge | interface da aplicação ao cluster |
+| config servers | metadata de ranges e topologia | não guardam o dataset como backup |
+| shard key | distribuição e routing | cardinalidade, frequência, monotonicidade |
+| ranged | preserva proximidade de valores | favorece range queries |
+| hashed | distribui pelo hash | favorece equality e dispersão de writes |
+| targeted query | consulta shard(s) relevante(s) | filtro contém informação da shard key |
+| scatter-gather | consulta todos os shards | filtro não permite targeting suficiente |
+| balancer | migra ranges | corrige desequilíbrio com custo operacional |
+| refinement | acrescenta sufixo à shard key | preserva a key existente |
+| resharding | redefine ou redistribui a collection | operação administrativa planeada |
 
 ### Tabela de BSON types
 
@@ -520,6 +571,7 @@ Resultado: uma linha agregada por localização, processada por cursor.
 | catálogo              | `find` + projection + keyset | filtro/sort compound                        |
 | carrinho              | embedded items + `$[id]`     | atomicidade single-document                 |
 | checkout              | transação curta              | unique/idempotency + majority               |
+| SaaS de grande escala | sharding por access pattern | shard key tenant-scoped + índices locais     |
 | relatório             | aggregation cursor           | match inicial/index                         |
 | pesquisa              | `$search compound`           | static search mapping                       |
 | sessões               | TTL                          | autorização não depende da remoção imediata |
@@ -534,16 +586,18 @@ Resultado: uma linha agregada por localização, processada por cursor.
 1. O filtro reduz cardinalidade cedo?
 2. O índice suporta equality, sort e range na ordem certa?
 3. `totalDocsExamined`/`totalKeysExamined` estão proporcionais a `nReturned`?
-4. A projection reduz payload ou cobre a query?
-5. Existe sort blocking?
-6. `skip` é profundo?
-7. `$unwind` multiplica quantas vezes?
-8. `$group/$facet/$sort` podem fazer spill?
-9. O cursor é iterado ou materializado?
-10. Quantos round trips e processos/pools existem?
-11. O write atualiza quantos índices?
-12. A transação cruza shards ou permanece longa?
-13. Search mapping indexa apenas o necessário?
+4. Quantos shards recebem a operação e porquê?
+5. Cada shard usa um índice eficiente localmente?
+6. A projection reduz payload ou cobre a query?
+7. Existe sort blocking?
+8. `skip` é profundo?
+9. `$unwind` multiplica quantas vezes?
+10. `$group/$facet/$sort` podem fazer spill?
+11. O cursor é iterado ou materializado?
+12. Quantos round trips e processos/pools existem?
+13. O write atualiza quantos índices?
+14. A transação cruza shards ou permanece longa?
+15. Search mapping indexa apenas o necessário?
 
 Complexidades são orientações:
 
@@ -559,7 +613,7 @@ O plano, os dados e o ambiente determinam a latência real.
 
 ## Armadilhas comuns
 
-### 50 erros que devo evitar
+### 55 erros que devo evitar
 
 1. Criar `MongoClient` por request.
 2. Guardar a URI/credentials no Git.
@@ -611,6 +665,11 @@ O plano, os dados e o ambiente determinam a latência real.
 48. Assumir que a callback de `withTransaction()` executa uma única vez.
 49. Esperar consistência imediata de um search index após write.
 50. Usar regex não ancorada como substituto geral de MongoDB Search.
+51. Shardear para esconder uma query sem índice ou um modelo inadequado.
+52. Escolher shard key apenas por ter alta cardinalidade.
+53. Omitir a shard key das queries críticas e ignorar scatter-gather.
+54. Confundir primary shard com o primary de um replica set.
+55. Assumir que balancer, migrations e resharding não consomem recursos.
 
 ---
 
@@ -654,6 +713,17 @@ O plano, os dados e o ambiente determinam a latência real.
 - [ ] Leio `COLLSCAN`, `IXSCAN`, `FETCH` e métricas.
 - [ ] Conheço unique, partial e TTL.
 
+#### Sharding
+
+- [ ] Distingo replicação, vertical scaling e sharding.
+- [ ] Explico shards, `mongos`, config servers e balancer.
+- [ ] Avalio cardinalidade, frequência e monotonicidade de uma shard key.
+- [ ] Comparo ranged, hashed e zoned sharding.
+- [ ] Prevejo targeted queries e scatter-gather.
+- [ ] Separo routing global de uso de índice local.
+- [ ] Distingo primary shard de replica set primary.
+- [ ] Reconheço o custo de migrations e operações cross-shard.
+
 #### Aggregation, transactions e Search
 
 - [ ] Distingo stage, expression e accumulator.
@@ -682,7 +752,7 @@ O plano, os dados e o ambiente determinam a latência real.
 
 ## Resumo
 
-### Top 100 conceitos que devo saber
+### Top 110 conceitos que devo saber
 
 1. MongoDB guarda documentos BSON, não texto JSON.
 2. Cada documento tem `_id` único e indexado.
@@ -773,23 +843,33 @@ O plano, os dados e o ambiente determinam a latência real.
 87. Covered query pode ter `totalDocsExamined: 0`.
 88. `IXSCAN` sozinho não prova eficiência.
 89. TTL remove documentos de forma assíncrona.
-90. Aggregation pipeline é uma sequência ordered de stages.
-91. `$match` cedo pode usar índice e reduzir cardinalidade.
-92. `$unwind` emite um documento por elemento.
-93. `$group._id` é a chave de grupo.
-94. `$sort` e `$group` podem ser blocking.
-95. `aggregate()` devolve `AggregationCursor`.
-96. Transações exigem session e todas as operações recebem-na.
-97. `withTransaction()` pode repetir a callback.
-98. Não há operações paralelas numa única transação do driver.
-99. `$search` usa search index e deve iniciar a pipeline.
-100. `$searchMeta` devolve metadata; `compound.filter` não pontua.
+90. Sharding distribui horizontalmente os dados e o workload.
+91. Cada shard é normalmente um replica set.
+92. `mongos` faz routing; config servers guardam metadata.
+93. A shard key determina distribuição e targeting.
+94. Cardinalidade alta não compensa frequência ou monotonicidade inadequadas.
+95. Ranged preserva localidade; hashed favorece distribuição.
+96. Uma targeted query reduz o número de shards participantes.
+97. Scatter-gather consulta vários shards e exige merge dos resultados.
+98. Shard key decide onde procurar; índice decide como procurar localmente.
+99. Balancer e migrations corrigem distribuição com custo operacional.
+100. Aggregation pipeline é uma sequência ordered de stages.
+101. `$match` cedo pode usar índice e reduzir cardinalidade.
+102. `$unwind` emite um documento por elemento.
+103. `$group._id` é a chave de grupo.
+104. `$sort` e `$group` podem ser blocking.
+105. `aggregate()` devolve `AggregationCursor`.
+106. Transações exigem session e todas as operações recebem-na.
+107. `withTransaction()` pode repetir a callback.
+108. Não há operações paralelas numa única transação do driver.
+109. `$search` usa search index e deve iniciar a pipeline.
+110. `$searchMeta` devolve metadata; `compound.filter` não pontua.
 
 ### Regra final
 
-Para qualquer pergunta, identificar **método → input → tipo BSON → cardinalidade → retorno → atomicidade → índice → custo**. Se estes oito pontos estiverem claros, a maior parte das alternativas erradas torna-se visível.
+Para qualquer pergunta, identificar **método → input → tipo BSON → cardinalidade → retorno → atomicidade → routing → índice → custo**. Se estes nove pontos estiverem claros, a maior parte das alternativas erradas torna-se visível. Em deployments não sharded, o passo de routing reduz-se à seleção normal da topologia.
 
-Fontes oficiais de revisão: [Learning Path](https://learn.mongodb.com/learning-paths/mongodb-nodejs-developer-path), [guia do Node.js Driver](https://www.mongodb.com/docs/drivers/node/current/), [MongoDB Manual](https://www.mongodb.com/docs/manual/), [MQL reference](https://www.mongodb.com/docs/manual/reference/mql/), [Aggregation](https://www.mongodb.com/docs/manual/aggregation/), [Transactions](https://www.mongodb.com/docs/manual/core/transactions/) e [MongoDB Search](https://www.mongodb.com/docs/search/).
+Fontes oficiais de revisão: [Learning Path](https://learn.mongodb.com/learning-paths/mongodb-nodejs-developer-path), [guia do Node.js Driver](https://www.mongodb.com/docs/drivers/node/current/), [MongoDB Manual](https://www.mongodb.com/docs/manual/), [MQL reference](https://www.mongodb.com/docs/manual/reference/mql/), [Sharding](https://www.mongodb.com/docs/manual/sharding/), [Aggregation](https://www.mongodb.com/docs/manual/aggregation/), [Transactions](https://www.mongodb.com/docs/manual/core/transactions/) e [MongoDB Search](https://www.mongodb.com/docs/search/).
 
 ---
 
@@ -805,7 +885,7 @@ Fontes oficiais de revisão: [Learning Path](https://learn.mongodb.com/learning-
 
 > ### DICA DE MEMORIZAÇÃO
 >
-> **Método → Input → Tipo → Quantos → Retorno → Atomicidade → Índice → Custo.** Esta é a checklist de oito passos para qualquer snippet.
+> **Método → Input → Tipo → Quantos → Retorno → Atomicidade → Routing → Índice → Custo.** Esta é a checklist de nove passos para qualquer snippet.
 
 > ### COMPARAÇÃO
 >
@@ -818,6 +898,7 @@ Fontes oficiais de revisão: [Learning Path](https://learn.mongodb.com/learning-
 | “substituir”                    | `replaceOne()`              | replacement completo intencional?   |
 | “agrupar/calcular/juntar”       | `aggregate()`               | cardinalidade e blocking stages?    |
 | “garantir unicidade”            | unique index                | filtro e normalização corretos?     |
+| “distribuir horizontalmente”    | sharding                    | shard key e queries ficam alinhadas? |
 | “all-or-nothing em vários docs” | transação                   | o modelo pode evitar?               |
 | “relevância/autocomplete”       | MongoDB Search              | mapping e search index existem?     |
 
@@ -844,7 +925,8 @@ MongoDB Associate Developer (Node.js)
 |
 +-- Performance
 |   +-- single / compound / multikey / unique / TTL
-|   `-- explain / cardinalidade / memória / round trips
+|   +-- explain / cardinalidade / memória / round trips
+|   `-- sharding / shard key / targeted / scatter-gather
 |
 `-- Coordenação e pesquisa
     +-- aggregation stages / expressions / accumulators
@@ -863,12 +945,15 @@ Qual é o verbo da pergunta?
 |               precisa do documento? findOneAnd*
 +-- eliminar --> um? deleteOne : muitos? deleteMany
 +-- calcular --> aggregate -> controlar cardinalidade/memória
++-- distribuir horizontalmente --> shard key alinha com o workload?
+|                                   |-- não --> rever modelo/queries
+|                                   `-- sim --> testar distribuição + targeting
 +-- pesquisar relevância --> $search -> confirmar search index
 `-- coordenar vários docs --> modelo resolve?
                               |-- sim --> write single-document
                               `-- não --> transação curta
 
-Depois: tipo BSON -> retorno -> atomicidade -> índice -> custo
+Depois: tipo BSON -> retorno -> atomicidade -> routing -> índice -> custo
 ```
 
 ### Mini desafio final
@@ -913,6 +998,8 @@ const c = await users.findOneAndUpdate(
 - Filtrar cedo e limitar payload/cardinalidade.
 - ESR como heurística; `explain` como evidência.
 - Nunca inferir eficiência apenas de `IXSCAN`.
+- Shard key decide routing; o índice local decide o plano dentro do shard.
+- Targeted query reduz fan-out; scatter-gather consulta vários shards.
 - Não aceitar filtros ou pipelines arbitrários do utilizador.
 - Credenciais fora do código e roles mínimas.
 
@@ -931,9 +1018,9 @@ const c = await users.findOneAndUpdate(
 |     0–5 | tipos BSON e retornos dos métodos    |
 |    5–10 | CRUD, contadores e arrays            |
 |   10–15 | projection, sort, paginação e counts |
-|   15–20 | compound/multikey, ESR e explain     |
-|   20–25 | aggregation, cursor e memória        |
-|   25–30 | transactions, Search e 50 armadilhas |
+|   15–20 | indexes, sharding, targeting e explain |
+|   20–25 | aggregation, cursor e memória         |
+|   25–30 | transactions, Search e 55 armadilhas  |
 
 ---
 
@@ -943,6 +1030,7 @@ const c = await users.findOneAndUpdate(
 - Confirmar tipo BSON e fronteira de atomicidade.
 - Distinguir patch, replacement e compound operation.
 - Tratar cursor, índice e memória como partes da resposta.
+- Separar shard routing do plano de execução local.
 - Modelar antes de transacionar; medir antes de otimizar.
 - Eliminar alternativas pelo detalhe técnico, não por familiaridade.
 
@@ -955,17 +1043,18 @@ const c = await users.findOneAndUpdate(
 - [ ] Reconheço os query e update operators essenciais.
 - [ ] Prevejo cardinalidade de uma pipeline.
 - [ ] Desenho e avalio compound/multikey indexes.
+- [ ] Avalio shard keys e prevejo targeted versus scatter-gather.
 - [ ] Interpreto contadores e `executionStats`.
 - [ ] Decido quando não usar uma transação.
 - [ ] Distingo database, text e search indexes.
-- [ ] Consigo explicar os 50 erros sem consultar a solução.
-- [ ] Aplico os oito passos a código desconhecido.
+- [ ] Consigo explicar os 55 erros sem consultar a solução.
+- [ ] Aplico os nove passos a código desconhecido.
 
 ---
 
 ## Perguntas para confirmar conhecimentos
 
-1. Que oito passos deves aplicar a qualquer pergunta com código?
+1. Que nove passos deves aplicar a qualquer pergunta com código?
 2. Que métodos devolvem cursor e quais devolvem documento/`null`?
 3. Que result objects e contadores precisas de reconhecer?
 4. Como distingues update parcial, replacement e compound operation?
@@ -973,10 +1062,11 @@ const c = await users.findOneAndUpdate(
 6. Como distinguem projection, schema e covered query?
 7. Como escolhes a ordem de um compound index e verificas a decisão?
 8. Que restrições próprias têm multikey indexes?
-9. Como a ordem de stages altera cardinalidade e memória?
-10. Quando deves iterar um cursor em vez de usar `toArray()`?
-11. Que condições justificam uma transação multi-documento?
-12. Que regras tornam uma callback de transação segura para retries?
-13. Como diferem B-tree, text index e MongoDB Search?
-14. Que cinco armadilhas tens maior probabilidade de cometer sob pressão?
-15. Como explicarias por que as alternativas erradas de uma pergunta parecem plausíveis?
+9. Como avalias uma shard key e distingues targeting de execução indexada local?
+10. Como a ordem de stages altera cardinalidade e memória?
+11. Quando deves iterar um cursor em vez de usar `toArray()`?
+12. Que condições justificam uma transação multi-documento?
+13. Que regras tornam uma callback de transação segura para retries?
+14. Como diferem B-tree, text index e MongoDB Search?
+15. Que cinco armadilhas tens maior probabilidade de cometer sob pressão?
+16. Como explicarias por que as alternativas erradas de uma pergunta parecem plausíveis?

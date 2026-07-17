@@ -135,6 +135,21 @@ Escolher garantias pelo domínio. Dentro de transação, evitar alterar concerns
 
 ### Convenient Transaction API
 
+Existem dois objetos com ciclos de vida diferentes:
+
+```text
+ClientSession -> começa antes da tentativa e termina no finally
+transaction   -> começa/termina dentro da session e pode ter tentativas repetidas
+```
+
+A assinatura conceptual principal é:
+
+```javascript
+const callbackResult = await session.withTransaction(callback, options);
+```
+
+`callback` contém as operações que pertencem à unidade transacional. `options` define concerns, routing e limite de commit para as tentativas geridas pela Convenient API.
+
 ```javascript
 const session = client.startSession();
 
@@ -163,6 +178,20 @@ try {
 }
 ```
 
+Leitura por etapas:
+
+1. `startSession()` cria uma `ClientSession`; ainda não executa a transação de negócio.
+2. `withTransaction()` inicia a transação, invoca a callback e tenta commit.
+3. Todas as operações participantes recebem **a mesma** `{ session }` nas options.
+4. `return { first, second }` define o valor devolvido por `withTransaction()` após sucesso; não é o commit result.
+5. `readPreference: "primary"` encaminha as reads transacionais para o primary.
+6. `readConcern: { level: "snapshot" }` pede uma visão consistente suportada da transação.
+7. `writeConcern: { w: "majority" }` configura acknowledgement do commit.
+8. `maxCommitTimeMS` limita a fase de commit, não toda a execução da callback.
+9. `endSession()` liberta a session tanto após sucesso como após erro.
+
+A callback pode ser executada mais do que uma vez quando a API trata um erro transiente. Por isso, não deve enviar email, cobrar um serviço externo ou produzir outro side effect não idempotente dentro da callback sem desenho específico.
+
 ### Core API
 
 ```javascript
@@ -181,6 +210,8 @@ try {
 
 Este esqueleto não implementa os retries exigidos para todos os labels; por isso a Convenient API é mais segura como default.
 
+Na Core API, a aplicação controla `startTransaction()`, `commitTransaction()` e `abortTransaction()`. Isso também transfere para a aplicação a responsabilidade de interpretar error labels e implementar os ciclos de retry corretos. `abortTransaction()` no `catch` desfaz o trabalho MongoDB não confirmado; não desfaz side effects externos.
+
 ### Sem paralelismo dentro da transação
 
 Não usar:
@@ -193,6 +224,8 @@ await Promise.all([
 ```
 
 O Node.js Driver não suporta operações paralelas numa única transação. Executá-las sequencialmente.
+
+`Promise.all()` tentaria usar a mesma session/transaction em operações concorrentes. A correção é aguardar a primeira operação antes de iniciar a segunda. Isto é uma restrição do contrato da transação no driver, não apenas uma preferência de estilo.
 
 ---
 
@@ -510,7 +543,7 @@ Fontes oficiais: [transactions no driver](https://www.mongodb.com/docs/drivers/n
 | API conveniente                   | `withTransaction()`      | retries/commit/abort geridos     |
 | controlo manual específico        | Core API                 | retry logic fica na aplicação    |
 
-> **Ligação entre capítulos:** modelação/embedding está no capítulo 02; unique indexes no 09; lifecycle do client no 04.
+> **Ligação entre capítulos:** modelação/embedding está no capítulo 02; unique indexes no 09; sharding e coordenação cross-shard no 10; lifecycle do client no 04.
 
 ### Fluxograma: preciso de transação?
 

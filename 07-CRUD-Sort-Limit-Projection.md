@@ -12,6 +12,41 @@
 
 ## Conceitos Fundamentais
 
+### Uma query não termina no filtro
+
+No capítulo anterior, o filtro decidiu **quais** documentos correspondem. Uma leitura real precisa frequentemente de responder a mais quatro perguntas:
+
+1. **Em que ordem** devem aparecer? — `sort`.
+2. **Quantos** podem ser devolvidos? — `limit`.
+3. **Que campos** pode o cliente receber? — `projection`.
+4. **Quantos matches existem** sem devolver os documentos? — operações de count.
+
+Considere:
+
+```javascript
+const cursor = movies.find(
+    { genres: "Drama" },
+    {
+        sort: { year: -1, _id: 1 },
+        limit: 10,
+        projection: { title: 1, year: 1 },
+    },
+);
+```
+
+Esta leitura deve ser interpretada por camadas:
+
+```text
+collection movies
+    -> filtrar documentos cujo array genres contém "Drama"
+    -> ordenar por year descendente e _id ascendente
+    -> reter no máximo 10
+    -> devolver apenas title, year e o _id incluído por defeito
+    -> produzir um cursor que ainda terá de ser consumido
+```
+
+Os objetos não são intercambiáveis. `{ genres: "Drama" }` é um **filter**; `{ year: -1, _id: 1 }` é uma **sort specification**; `{ title: 1, year: 1 }` é uma **projection**. O mesmo número `1` tem significados dependentes do contexto: ascendente no sort, inclusão na projection.
+
 ### Sort
 
 `{ field: 1 }` ordena ascendentemente e `{ field: -1 }` descendentemente. Num compound sort, a ordem das chaves define a precedência:
@@ -110,6 +145,14 @@ A segunda mantém uma fronteira lexicográfica para sort descendente `{ createdA
 
 ### Formas em options
 
+A assinatura conceptual é:
+
+```javascript
+collection.find(filter, options);
+```
+
+`find()` devolve imediatamente um `FindCursor`. O `await` só aparece quando o cursor é consumido, por exemplo com `toArray()`, `next()` ou `for await...of`.
+
 ```javascript
 const cursor = collection.find(filter, {
     projection: { _id: 0, title: 1, year: 1 },
@@ -118,6 +161,18 @@ const cursor = collection.find(filter, {
     skip: 0,
 });
 ```
+
+Cada parte tem uma responsabilidade diferente:
+
+| Parte        | Forma esperada                  | O que controla                                                                  |
+| ------------ | ------------------------------- | ------------------------------------------------------------------------------- |
+| `filter`     | documento MQL                   | quais documentos são candidatos                                                 |
+| `projection` | documento de inclusão/exclusão  | que fields são devolvidos                                                       |
+| `sort`       | documento ordenado de fields    | ordem do resultado; `1` ascendente, `-1` descendente                            |
+| `limit`      | integer não negativo            | máximo de documentos devolvidos                                                 |
+| `skip`       | integer não negativo            | quantos resultados já ordenados são ignorados antes de devolver                 |
+
+No exemplo, `_id: 0` é a exceção permitida dentro de uma projection inclusiva. `limit: 25` não quer dizer “batch de 25”; limita a cardinalidade total do cursor. `skip: 0` não altera o resultado e existe apenas para tornar explícita a primeira página por offset.
 
 ### Forma encadeada
 
@@ -129,6 +184,15 @@ const cursor = collection
     .skip(0)
     .limit(25);
 ```
+
+Esta forma descreve a mesma intenção. Cada método configura e devolve o próprio cursor, permitindo encadear a chamada seguinte:
+
+- `project(specification)` configura a projection;
+- `sort(specification)` configura a ordem;
+- `skip(number)` configura o offset;
+- `limit(number)` configura o máximo total.
+
+O encadeamento escrito não deve ser interpretado como quatro round trips independentes. O driver reúne a configuração para executar a operação. O servidor pode ainda otimizar a combinação, desde que preserve a semântica.
 
 Configurar o cursor antes da iteração. Não executar operações assíncronas concorrentes sobre o mesmo cursor nem misturar paradigmas como `toArray()` e `for await`.
 
@@ -148,6 +212,8 @@ const exampleProjections = [
 ];
 ```
 
+No primeiro objeto, `$slice: 3` devolve os três primeiros elementos de `cast`; não filtra os documentos da collection. No segundo, `$elemMatch` é um operador de projection: devolve o primeiro elemento de `grades` que satisfaz ambas as condições. Isto é diferente de usar `$elemMatch` no filtro, onde o objetivo é decidir se o documento corresponde.
+
 ### Counts
 
 ```javascript
@@ -158,6 +224,13 @@ const exact = await collection.countDocuments(
 
 const estimate = await collection.estimatedDocumentCount();
 ```
+
+Anatomia das duas chamadas:
+
+- `countDocuments(filter, options)` aceita um filtro e executa uma contagem exata dos matches segundo a semântica da query; `maxTimeMS` limita o tempo server-side;
+- `estimatedDocumentCount(options)` não aceita filtro e usa metadata da collection para obter rapidamente uma estimativa do total;
+- ambos devolvem `Promise<number>`, não cursores nem documentos;
+- `countDocuments({})` e `estimatedDocumentCount()` podem produzir valores iguais num instante, mas não executam o mesmo trabalho nem oferecem a mesma garantia.
 
 ---
 
